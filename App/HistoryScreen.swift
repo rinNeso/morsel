@@ -4,12 +4,13 @@ import SwiftUI
 struct HistoryScreen: View {
     @Environment(\.mealStore) private var store
     @Environment(MealTimerModel.self) private var timer
+    @Environment(AppSettings.self) private var settings
 
     @State private var meals: [MealHistoryEntry] = []
     @State private var loaded = false
     @State private var pending: PendingDelete?
-    @State private var selection = Set<Int64>()
-    @State private var editMode: EditMode = .inactive
+    @State private var selecting = false
+    @State private var selection: Set<Int64> = []
 
     /// A deleted meal is gone for good — no backend, no trash — so deletes are
     /// held for a few seconds rather than confirmed up front. HIG prefers undo
@@ -35,31 +36,14 @@ struct HistoryScreen: View {
                         description: Text("Start one from the Timer tab.")
                     )
                 } else {
-                    List(selection: $selection) {
-                        ForEach(meals) { meal in
-                            MealRow(meal: meal)
-                        }
-                        .onDelete(perform: deleteSwiped)
-                    }
-                    .listStyle(.insetGrouped)
-                    .environment(\.editMode, $editMode)
+                    list
                 }
             }
-            .navigationTitle("Meal history")
+            .navigationTitle(selecting ? "\(selection.count) selected" : "Meal history")
+            .navigationBarTitleDisplayMode(selecting ? .inline : .large)
             .background(Palette.bg)
             .refreshable { await load() }
-            .toolbar {
-                if !meals.isEmpty {
-                    ToolbarItem(placement: .topBarTrailing) { EditButton() }
-                }
-                if editMode.isEditing && !selection.isEmpty {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Delete (\(selection.count))", role: .destructive) {
-                            deleteSelected()
-                        }
-                    }
-                }
-            }
+            .toolbar { selectionToolbar }
             .overlay(alignment: .bottom) {
                 if pending != nil { undoBanner }
             }
@@ -69,6 +53,65 @@ struct HistoryScreen: View {
         // timer falls back to idle rather than polling.
         .onChange(of: timer.state.phase) { _, phase in
             if phase == .idle { Task { await load() } }
+        }
+    }
+
+    private var list: some View {
+        List {
+            ForEach(meals) { meal in
+                HStack(spacing: 12) {
+                    if selecting {
+                        let picked = selection.contains(meal.id)
+                        Image(systemName: picked ? "checkmark.circle.fill" : "circle")
+                            .font(.title3)
+                            .foregroundStyle(picked ? settings.accent : Palette.dim)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                    MealRow(meal: meal)
+                }
+                .contentShape(.rect)
+                .onTapGesture {
+                    guard selecting else { return }
+                    toggle(meal)
+                }
+                .onLongPressGesture {
+                    beginSelecting(with: meal)
+                }
+            }
+            .onDelete(perform: swipeDelete)
+        }
+        .listStyle(.insetGrouped)
+        .animation(.snappy(duration: 0.2), value: selecting)
+    }
+
+    /// Swiping and selecting are different modes; leaving swipe live during
+    /// selection makes a half-swipe delete the wrong meal. Hoisted out of the
+    /// view builder because inferring an optional closure from a ternary over a
+    /// method reference is enough to defeat the type checker.
+    private var swipeDelete: ((IndexSet) -> Void)? {
+        guard !selecting else { return nil }
+        return { offsets in hold(offsets.sorted()) }
+    }
+
+    // The condition sits inside each item rather than wrapping them: a
+    // top-level `if` in a ToolbarContentBuilder makes the compiler fail to
+    // produce a diagnostic at all, which is a miserable thing to debug.
+    @ToolbarContentBuilder
+    private var selectionToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            if selecting {
+                Button("Cancel") { endSelecting() }
+            }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            if selecting {
+                Button(role: .destructive) {
+                    deleteSelected()
+                } label: {
+                    Label("Delete selected", systemImage: "trash")
+                }
+                .disabled(selection.isEmpty)
+            }
         }
     }
 
@@ -95,17 +138,40 @@ struct HistoryScreen: View {
         loaded = true
     }
 
+    // MARK: Selecting
+
+    private func beginSelecting(with meal: MealHistoryEntry) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation {
+            selecting = true
+            selection = [meal.id]
+        }
+    }
+
+    private func toggle(_ meal: MealHistoryEntry) {
+        withAnimation {
+            if selection.contains(meal.id) {
+                selection.remove(meal.id)
+            } else {
+                selection.insert(meal.id)
+            }
+        }
+    }
+
+    private func endSelecting() {
+        withAnimation {
+            selecting = false
+            selection.removeAll()
+        }
+    }
+
     // MARK: Deleting
 
-    private func deleteSwiped(at offsets: IndexSet) {
-        hold(offsets.sorted())
-    }
 
     private func deleteSelected() {
         let indices = meals.indices.filter { selection.contains(meals[$0].id) }
         hold(indices)
-        selection.removeAll()
-        editMode = .inactive
+        endSelecting()
     }
 
     /// Pull the rows out of the list now, commit them to the store once the
