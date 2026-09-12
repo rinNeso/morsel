@@ -22,6 +22,9 @@ struct SettingsScreen: View {
     @Environment(\.theme) private var theme
     @Environment(\.mealStore) private var store
 
+    @State private var importing = false
+    @State private var importMessage: String?
+
     var body: some View {
         NavigationStack {
             Form {
@@ -70,14 +73,65 @@ struct SettingsScreen: View {
                             Label("Export data", systemImage: "square.and.arrow.up")
                         }
                     }
+                    Button {
+                        importing = true
+                    } label: {
+                        Label("Import data", systemImage: "square.and.arrow.down")
+                    }
+                    .disabled(store == nil)
                 } header: {
                     Text("Backup")
                 } footer: {
-                    Text("Every meal, bite and setting as a JSON file. There is no account and no sync, so this file is the only copy that survives deleting the app or changing phones — save it somewhere that outlives this device.")
+                    Text("Every meal, bite and setting as a JSON file. There is no account and no sync, so this file is the only copy that survives deleting the app or changing phones — save it somewhere that outlives this device.\n\nImporting merges: meals already here are left alone, and importing the same file twice changes nothing.")
                 }
             }
             .navigationTitle("Settings")
+            .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
+                handleImport(result)
+            }
+            .alert("Import", isPresented: showingImportResult) {
+                Button("OK") { importMessage = nil }
+            } message: {
+                Text(importMessage ?? "")
+            }
         }
+    }
+
+    private var showingImportResult: Binding<Bool> {
+        Binding(get: { importMessage != nil }, set: { if !$0 { importMessage = nil } })
+    }
+
+    private func handleImport(_ result: Result<URL, Error>) {
+        guard let store else { return }
+        switch result {
+        case .failure(let error):
+            importMessage = error.localizedDescription
+        case .success(let url):
+            Task {
+                // Files handed over by the picker live outside our sandbox.
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    let outcome = try await store.importJSON(try Data(contentsOf: url))
+                    importMessage = Self.describe(outcome)
+                    // Settings may have arrived with the file.
+                    await settings.load()
+                } catch {
+                    importMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private static func describe(_ result: ImportResult) -> String {
+        var parts = ["Imported \(result.imported) meal\(result.imported == 1 ? "" : "s")."]
+        if result.skipped > 0 {
+            parts.append("\(result.skipped) already here, left alone.")
+        }
+        if result.settingsApplied > 0 {
+            parts.append("Appearance settings restored.")
+        }
+        return parts.joined(separator: " ")
     }
 
     private var accentBinding: Binding<Color> {
