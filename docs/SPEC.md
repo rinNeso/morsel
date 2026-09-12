@@ -22,6 +22,12 @@ same meal at 10s/bite lands at fullness 4, that is the whole thesis demonstrated
 personal data. Designing for that correlation from day one is why `fullness` and
 `bite` timings are first-class columns rather than afterthoughts.
 
+The second signal, cheaper still: **pace drift** — mean time-to-confirm across
+the first third of a meal versus the last third. The rest interval is enforced
+by the timer and so barely varies, but how long you take over each bite is all
+yours. A drift below 1 means you sped up as the meal went on, which is the
+failure mode worth catching.
+
 ## Architecture
 
 - **Expo (React Native) + TypeScript.** Dev loop runs entirely on Linux; the iPhone
@@ -53,15 +59,30 @@ Design decisions worth stating:
 - **Constant interval, not adaptive.** People naturally decelerate through a meal;
   the intervention is precisely to stop the fast opening. Research protocols use a
   fixed pace. Configurable, default 30s.
+- **All timing derives from wall-clock timestamps, never accumulated ticks.** iOS
+  suspends JS timers on background and lock. A tick counter would silently lose
+  time and turn the meal record into fiction; deriving every duration from
+  `Date.now()` means backgrounding costs nothing and resuming is a recomputation.
 - **Two ways to set it.** Either a raw interval, or a target meal duration plus
   expected bite count, which derives the interval. The second frames it as
   "make this meal last 20 minutes," which is the actual goal.
 - **Pause must be enormous.** Conversation, getting up, refilling a drink. A timer
   you can't pause instantly gets abandoned. Paused time is tracked separately so
   meal duration stats stay honest.
-- **Passive by default.** It cues; it does not require you to confirm each bite.
-  Tapping to confirm is optional and produces better `bite.taken_at` data, but
-  demanding interaction 40 times per meal would make the app exhausting.
+- **Confirmation is required, and the friction is the point.** The tap is not
+  logging overhead; it is the intervention. It marks that the utensil went down,
+  which is the behaviour being trained. That reframing is why the interaction
+  cost is acceptable where it would not be for ordinary data entry.
+- **Rest starts on confirmation, not on the cue.** This follows directly from the
+  above. A fixed-cadence metronome would keep cueing while you were still chewing,
+  so a slow chew would consume its own rest period — penalising exactly the
+  behaviour the app rewards. Starting the interval at confirmation makes the
+  timer wait for you, and meal duration emerges from real chewing speed rather
+  than being imposed. The configured interval is therefore a *minimum rest
+  between bites*, not a cadence.
+- **Early bites are recorded, not blocked.** Confirming during a rest window is
+  allowed and flagged `early`. Impatience becomes data rather than a fight with
+  a disabled button.
 - **Backgrounding.** iOS will not run a JS timer reliably with the screen locked.
   Two-part answer: `expo-keep-awake` holds the screen on while a meal is active
   (phone sits on the table), and a batch of local notifications is pre-scheduled at

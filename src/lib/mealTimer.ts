@@ -68,7 +68,8 @@ export type Event =
   | { type: "PAUSE" }
   | { type: "RESUME" }
   | { type: "SET_REST"; restMs: number }
-  | { type: "END" };
+  | { type: "END" }
+  | { type: "RESET" };
 
 export const DEFAULT_REST_MS = 30_000;
 
@@ -200,6 +201,11 @@ export function reduce(s: MealState, e: Event, now: number): MealState {
     case "SET_REST": {
       if (e.restMs <= 0) return s;
       return { ...s, restMs: e.restMs };
+    }
+
+    case "RESET": {
+      // Clear back to idle, keeping the chosen rest interval as the default.
+      return initialState(s.restMs);
     }
 
     case "END": {

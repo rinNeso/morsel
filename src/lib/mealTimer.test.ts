@@ -127,5 +127,19 @@ console.log("\n7. Guards and degenerate transitions");
   check("empty meal summarises safely", summarize(ended, T0 + 1000).meanRestMs === null);
 }
 
+console.log("\n8. RESET returns to idle, keeping the chosen interval");
+{
+  let s = run(initialState(45_000), [
+    [{ type: "START" }, 0],
+    [{ type: "CONFIRM_BITE" }, 1_000],
+    [{ type: "END" }, 60_000],
+    [{ type: "RESET" }, 61_000],
+  ]);
+  check("back to idle", s.phase === "idle");
+  check("bites cleared", s.bites.length === 0);
+  check("chosen rest interval retained", s.restMs === 45_000);
+  check("timestamps cleared", s.startedAt === null && s.endedAt === null);
+}
+
 console.log(`\n=== ${pass} passed, ${fail} failed ===`);
 process.exit(fail === 0 ? 0 : 1);
