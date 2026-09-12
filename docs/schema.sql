@@ -29,7 +29,12 @@ CREATE TABLE bite (
   seq        INTEGER NOT NULL,
   cued_at    TEXT    NOT NULL,
   taken_at   TEXT,               -- null when the user didn't confirm; cue still logged
-  interval_s REAL                -- actual elapsed since previous cue, excluding pauses
+  interval_s REAL,               -- actual elapsed since previous cue, excluding pauses
+  -- Stored rather than derived. It is tempting to infer "early" from
+  -- cued_at == taken_at, which does hold today because the reducer collapses
+  -- both onto `now` for a bite taken before its cue — but that is a
+  -- coincidence of the implementation, not something the data should depend on.
+  early      INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX bite_meal_idx ON bite(meal_id, seq);
 
