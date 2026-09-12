@@ -1,7 +1,25 @@
+import MorselData
 import SwiftUI
+import UniformTypeIdentifiers
+
+/// Wraps the store so the share sheet can pull JSON out of it lazily — the
+/// export is only generated if the user actually shares, not on every render.
+private struct ExportedData: Transferable {
+    let store: MealStore
+
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(exportedContentType: .json) { exported in
+            try await exported.store.exportJSON()
+        }
+        .suggestedFileName { _ in
+            "morsel-\(Date().formatted(.iso8601.year().month().day())).json"
+        }
+    }
+}
 
 struct SettingsScreen: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(\.mealStore) private var store
 
     var body: some View {
         NavigationStack {
@@ -40,6 +58,21 @@ struct SettingsScreen: View {
                     Text("Resting colour")
                 } footer: {
                     Text("The ring while you're waiting between bites. A separate colour makes \"resting\" and \"take a bite\" readable at a glance from across the table; the ring's fill and countdown already differ either way.")
+                }
+
+                Section {
+                    if let store {
+                        ShareLink(
+                            item: ExportedData(store: store),
+                            preview: SharePreview("Morsel data", image: Image(systemName: "square.and.arrow.up"))
+                        ) {
+                            Label("Export data", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                } header: {
+                    Text("Backup")
+                } footer: {
+                    Text("Every meal, bite and setting as a JSON file. There is no account and no sync, so this file is the only copy that survives deleting the app or changing phones — save it somewhere that outlives this device.")
                 }
             }
             .navigationTitle("Settings")

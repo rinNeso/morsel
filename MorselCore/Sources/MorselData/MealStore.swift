@@ -16,7 +16,8 @@ public struct MealHistoryEntry: Sendable, Equatable, Identifiable, FetchableReco
 
 /// Local-first store. No backend, no account, no network — the whole point.
 public final class MealStore: Sendable {
-    private let dbQueue: DatabaseQueue
+    /// Internal rather than private so Export.swift can read through it.
+    let dbQueue: DatabaseQueue
 
     /// - Parameter path: on-disk location, or nil for an in-memory database
     ///   (used by tests).

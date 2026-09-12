@@ -130,6 +130,72 @@ struct WritingMeals {
     }
 }
 
+@Suite("Export")
+struct Export {
+    @Test("a snapshot carries every meal, its bites, and the settings")
+    func snapshotIsComplete() async throws {
+        let store = try makeStore()
+        let mealID = try await store.createMeal(startedAt: t0, restMs: 30_000)
+
+        var state = MealState(restMs: 30_000).reduced(by: .start(), now: t0)
+        state = state.reduced(by: .confirmBite, now: t0)
+        try await store.insert(bite: state.bites[0], mealID: mealID)
+        state = state.reduced(by: .confirmBite, now: t0 + 5_000) // early
+        try await store.insert(bite: state.bites[1], mealID: mealID)
+        try await store.endMeal(id: mealID, endedAt: t0 + 60_000, pausedMs: 0)
+        try await store.setFullness(6, mealID: mealID)
+        try await store.setSetting("accent_color", to: "#3B82C4")
+
+        let snapshot = try await store.exportSnapshot()
+        #expect(snapshot.formatVersion == MorselExport.currentFormatVersion)
+        #expect(snapshot.settings["accent_color"] == "#3B82C4", "settings travel with the data")
+
+        let meal = try #require(snapshot.meals.first)
+        #expect(snapshot.meals.count == 1)
+        #expect(meal.fullnessAfter == 6)
+        #expect(meal.targetIntervalS == 30)
+        #expect(meal.bites.count == 2, "bites are nested under their meal, not dropped")
+        #expect(meal.bites[0].early == false)
+        #expect(meal.bites[1].early == true, "the early flag survives the round trip")
+        #expect(meal.bites.map(\.seq) == [1, 2], "bite order is preserved")
+    }
+
+    @Test("an in-progress meal is exported too — a backup that skips it loses it")
+    func exportsUnfinishedMeals() async throws {
+        let store = try makeStore()
+        _ = try await store.createMeal(startedAt: t0, restMs: 30_000)
+
+        let snapshot = try await store.exportSnapshot()
+        #expect(snapshot.meals.count == 1, "history hides unfinished meals; the backup must not")
+        #expect(snapshot.meals[0].endedAt == nil)
+    }
+
+    @Test("the JSON decodes back to an identical snapshot")
+    func jsonRoundTrips() async throws {
+        let store = try makeStore()
+        let mealID = try await store.createMeal(startedAt: t0, restMs: 45_000)
+        try await store.endMeal(id: mealID, endedAt: t0 + 60_000, pausedMs: 12_000)
+
+        let original = try await store.exportSnapshot()
+        let decoded = try JSONDecoder().decode(MorselExport.self, from: try await store.exportJSON())
+
+        // Everything but `exportedAt`, which is stamped per export and so is
+        // expected to differ between two separate calls.
+        #expect(decoded.meals == original.meals, "what is written is what can be read back")
+        #expect(decoded.settings == original.settings)
+        #expect(decoded.formatVersion == original.formatVersion)
+        #expect(millis(fromISO: decoded.exportedAt) != nil, "the stamp is a parseable timestamp")
+    }
+
+    @Test("an empty store still produces a valid snapshot")
+    func emptyExport() async throws {
+        let snapshot = try await makeStore().exportSnapshot()
+        #expect(snapshot.meals.isEmpty)
+        #expect(snapshot.settings.isEmpty)
+        #expect(snapshot.formatVersion == MorselExport.currentFormatVersion)
+    }
+}
+
 @Suite("Settings")
 struct Settings {
     @Test("settings round-trip and overwrite in place")
