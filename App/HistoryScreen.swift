@@ -4,12 +4,15 @@ import SwiftUI
 struct HistoryScreen: View {
     @Environment(\.mealStore) private var store
     @Environment(MealTimerModel.self) private var timer
-    @Environment(AppSettings.self) private var settings
 
     @State private var meals: [MealHistoryEntry] = []
     @State private var loaded = false
     @State private var pending: PendingDelete?
-    @State private var selecting = false
+    /// Owned here and pushed down into the List, rather than letting an
+    /// EditButton manage an ambient one. Mixing the two is what broke the
+    /// previous attempt: the button toggled the environment's editMode while
+    /// the List read a different binding, so nothing ever happened.
+    @State private var editing = false
     @State private var selection: Set<Int64> = []
 
     /// A deleted meal is gone for good — no backend, no trash — so deletes are
@@ -39,8 +42,8 @@ struct HistoryScreen: View {
                     list
                 }
             }
-            .navigationTitle(selecting ? "\(selection.count) selected" : "Meal history")
-            .navigationBarTitleDisplayMode(selecting ? .inline : .large)
+            .navigationTitle(editing ? "\(selection.count) selected" : "Meal history")
+            .navigationBarTitleDisplayMode(editing ? .inline : .large)
             .background(Palette.bg)
             .refreshable { await load() }
             .toolbar { selectionToolbar }
@@ -57,31 +60,16 @@ struct HistoryScreen: View {
     }
 
     private var list: some View {
-        List {
+        // List draws its own selection circles in edit mode; the rows stay
+        // plain content rather than hand-rolling checkmarks.
+        List(selection: $selection) {
             ForEach(meals) { meal in
-                HStack(spacing: 12) {
-                    if selecting {
-                        let picked = selection.contains(meal.id)
-                        Image(systemName: picked ? "checkmark.circle.fill" : "circle")
-                            .font(.title3)
-                            .foregroundStyle(picked ? settings.accent : Palette.dim)
-                            .transition(.scale.combined(with: .opacity))
-                    }
-                    MealRow(meal: meal)
-                }
-                .contentShape(.rect)
-                .onTapGesture {
-                    guard selecting else { return }
-                    toggle(meal)
-                }
-                .onLongPressGesture {
-                    beginSelecting(with: meal)
-                }
+                MealRow(meal: meal)
             }
             .onDelete(perform: swipeDelete)
         }
         .listStyle(.insetGrouped)
-        .animation(.snappy(duration: 0.2), value: selecting)
+        .environment(\.editMode, .constant(editing ? .active : .inactive))
     }
 
     /// Swiping and selecting are different modes; leaving swipe live during
@@ -89,7 +77,7 @@ struct HistoryScreen: View {
     /// view builder because inferring an optional closure from a ternary over a
     /// method reference is enough to defeat the type checker.
     private var swipeDelete: ((IndexSet) -> Void)? {
-        guard !selecting else { return nil }
+        guard !editing else { return nil }
         return { offsets in hold(offsets.sorted()) }
     }
 
@@ -98,13 +86,20 @@ struct HistoryScreen: View {
     // produce a diagnostic at all, which is a miserable thing to debug.
     @ToolbarContentBuilder
     private var selectionToolbar: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            if selecting {
-                Button("Cancel") { endSelecting() }
+        ToolbarItem(placement: .topBarTrailing) {
+            if !meals.isEmpty {
+                Button(editing ? "Done" : "Edit") {
+                    withAnimation {
+                        editing.toggle()
+                        if !editing { selection.removeAll() }
+                    }
+                }
             }
         }
-        ToolbarItem(placement: .topBarTrailing) {
-            if selecting {
+        // Mail and Photos put this in the bottom toolbar, which the floating
+        // tab bar already occupies, so it sits opposite Edit instead.
+        ToolbarItem(placement: .topBarLeading) {
+            if editing {
                 Button(role: .destructive) {
                     deleteSelected()
                 } label: {
@@ -138,40 +133,15 @@ struct HistoryScreen: View {
         loaded = true
     }
 
-    // MARK: Selecting
-
-    private func beginSelecting(with meal: MealHistoryEntry) {
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        withAnimation {
-            selecting = true
-            selection = [meal.id]
-        }
-    }
-
-    private func toggle(_ meal: MealHistoryEntry) {
-        withAnimation {
-            if selection.contains(meal.id) {
-                selection.remove(meal.id)
-            } else {
-                selection.insert(meal.id)
-            }
-        }
-    }
-
-    private func endSelecting() {
-        withAnimation {
-            selecting = false
-            selection.removeAll()
-        }
-    }
-
     // MARK: Deleting
-
 
     private func deleteSelected() {
         let indices = meals.indices.filter { selection.contains(meals[$0].id) }
         hold(indices)
-        endSelecting()
+        withAnimation {
+            editing = false
+            selection.removeAll()
+        }
     }
 
     /// Pull the rows out of the list now, commit them to the store once the
