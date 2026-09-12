@@ -23,6 +23,9 @@ struct WeightScreen: View {
     /// Captured when a pinch begins, so the zoom scales from where it started
     /// rather than compounding on every gesture update.
     @State private var pinchBase: Double?
+    /// Leading edge of the visible window. Bound rather than set once, because
+    /// zooming has to move it — see `zoom`.
+    @State private var scrollX = Date()
 
     var body: some View {
         NavigationStack {
@@ -179,9 +182,12 @@ struct WeightScreen: View {
             .chartYScale(domain: .automatic(includesZero: false))
             .chartXVisibleDomain(length: visibleDays * 86_400)
             .chartScrollableAxes(.horizontal)
-            .chartScrollPosition(initialX: initialScrollDate)
+            .chartScrollPosition(x: $scrollX)
             .frame(height: 240)
-            .gesture(zoom)
+            // Simultaneous, not plain `.gesture`: chartScrollableAxes installs
+            // a scroll view whose own recognisers take precedence, so an
+            // exclusive gesture here never sees the pinch at all.
+            .simultaneousGesture(zoom)
 
             Text("Pinch to zoom, drag to pan.")
                 .font(.caption2)
@@ -191,6 +197,14 @@ struct WeightScreen: View {
         .background(theme.card, in: .rect(cornerRadius: 16))
     }
 
+    /// How much of the pinch translates into zoom. Raw magnification is far too
+    /// eager — a modest pinch reaches 2x, which would halve the window in one
+    /// motion and make settling on a particular month nearly impossible. The
+    /// exponent damps it: at 0.5 the span halves only when the fingers travel
+    /// four times apart, so small adjustments stay fine-grained while a
+    /// deliberate gesture still covers ground.
+    private static let zoomDamping = 0.5
+
     /// Pinching out shows *less* time, which is what zooming in means — so the
     /// visible span divides by the magnification rather than multiplying.
     private var zoom: some Gesture {
@@ -198,7 +212,18 @@ struct WeightScreen: View {
             .onChanged { value in
                 let base = pinchBase ?? visibleDays
                 if pinchBase == nil { pinchBase = visibleDays }
-                visibleDays = min(max(base / value.magnification, 7), maxDays)
+                let damped = pow(max(value.magnification, 0.01), Self.zoomDamping)
+                let updated = min(max(base / damped, 7), maxDays)
+
+                // Hold the middle of the view still. Swift Charts anchors the
+                // scroll to the *leading* edge, so changing the span alone
+                // collapses the window towards wherever that edge happens to
+                // be — zoom in on the last fortnight and you end up looking at
+                // the middle of the series instead. Recentring keeps whatever
+                // you were reading under your fingers.
+                let centre = scrollX.addingTimeInterval(visibleDays * 86_400 / 2)
+                visibleDays = updated
+                scrollX = centre.addingTimeInterval(-updated * 86_400 / 2)
             }
             .onEnded { _ in pinchBase = nil }
     }
@@ -256,6 +281,7 @@ struct WeightScreen: View {
         points = (try? await store.weightPoints()) ?? []
         trend = ewmaTrend(points)
         rate = rateOfChange(points)
+        scrollX = initialScrollDate
         loaded = true
     }
 }
