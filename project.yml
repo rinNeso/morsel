@@ -29,7 +29,12 @@ targets:
     sources:
       - path: App
     dependencies:
+      # Both products are named explicitly; a bare `package:` entry would link
+      # only the product sharing the package's name.
       - package: MorselCore
+        product: MorselCore
+      - package: MorselCore
+        product: MorselData
     info:
       path: App/Info.plist
       properties:
