@@ -237,3 +237,92 @@ public func projectToGoal(
         reason: central == nil ? "trend is not moving toward the goal" : nil
     )
 }
+
+// MARK: - Progress readouts
+
+/// Change in the *trend* across a window, in kg. Negative is a loss.
+///
+/// Deliberately not the difference between two raw readings, which is how most
+/// apps show "lost this week". That compares two single mornings, each carrying
+/// a full day of water noise, and is about the worst available estimator — it
+/// will invent a loss one week and a gain the next from the same underlying
+/// body. Comparing the smoothed series at both ends uses every reading in
+/// between, so the number moves when the body does and stays put when it
+/// doesn't. A real gain still reports as a gain.
+///
+/// Returns nil when the series does not span the window.
+public func trendChange(_ points: [WeightPoint], overDays: Int, halfLifeDays: Double = 10) -> Double? {
+    let trend = ewmaTrend(points, halfLifeDays: halfLifeDays)
+    guard let latest = trend.last,
+          let latestDay = dayNumber(latest.date),
+          let earliest = trend.first,
+          let earliestDay = dayNumber(earliest.date),
+          latestDay - earliestDay >= 1
+    else { return nil }
+
+    let target = latestDay - overDays
+    guard earliestDay <= target else {
+        // The window reaches back further than the data; "all time" is the
+        // honest answer for that case, not a truncated window pretending to be
+        // the one asked for.
+        return nil
+    }
+
+    // The last reading at or before the window's start.
+    let start = trend.last { point in
+        guard let day = dayNumber(point.date) else { return false }
+        return day <= target
+    }
+    guard let start else { return nil }
+    return latest.trend - start.trend
+}
+
+/// Total change in the trend across the whole series, in kg.
+public func trendChangeAllTime(_ points: [WeightPoint], halfLifeDays: Double = 10) -> Double? {
+    let trend = ewmaTrend(points, halfLifeDays: halfLifeDays)
+    guard let first = trend.first, let last = trend.last, trend.count > 1 else { return nil }
+    return last.trend - first.trend
+}
+
+public struct Milestone: Sendable, Equatable {
+    public let index: Int
+    public let targetKg: Double
+    public let reached: Bool
+}
+
+/// Evenly spaced waypoints between where you started and where you're going.
+///
+/// The point is proximity: "0.4 kg to the next one" is motivating in a way that
+/// "9 kg to goal" is not. Works in either direction — a goal above the start
+/// produces ascending milestones.
+public func milestones(startKg: Double, goalKg: Double, count: Int, currentKg: Double) -> [Milestone] {
+    guard count > 0, startKg != goalKg else { return [] }
+    let step = (goalKg - startKg) / Double(count)
+    let losing = goalKg < startKg
+
+    return (1...count).map { index in
+        let target = startKg + step * Double(index)
+        return Milestone(
+            index: index,
+            targetKg: target,
+            reached: losing ? currentKg <= target : currentKg >= target
+        )
+    }
+}
+
+/// Projected trend weight `daysAhead` from the last reading, in kg.
+///
+/// Forecasting a weight at a date rather than a date at a weight, which is the
+/// more honest direction to run this: the uncertainty surfaces as a spread of
+/// weights instead of a date that reads as definite. Returns nil when there is
+/// not enough data to establish a rate.
+public func forecastWeight(
+    _ points: [WeightPoint],
+    daysAhead: Int,
+    windowDays: Int = 30,
+    halfLifeDays: Double = 10
+) -> Double? {
+    let trend = ewmaTrend(points, halfLifeDays: halfLifeDays)
+    guard let latest = trend.last, let rate = rateOfChange(points, windowDays: windowDays) else { return nil }
+    return latest.trend + (rate.kgPerWeek / 7) * Double(daysAhead)
+}

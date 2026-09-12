@@ -13,6 +13,10 @@ struct WeightScreen: View {
     @State private var rate: Rate?
     @State private var loaded = false
     @State private var entering = false
+    @State private var syncing = false
+    @State private var syncMessage: String?
+    @State private var basis: ForecastBasis = .current
+    @State private var editingGoal = false
 
     var body: some View {
         NavigationStack {
@@ -27,6 +31,12 @@ struct WeightScreen: View {
                     ScrollView {
                         VStack(spacing: 20) {
                             summary
+                            PredictionsPanel(points: points, trendKg: trend.last?.trend, basis: $basis)
+                            if let goal = settings.goalKg, let start = points.first?.kg,
+                               let current = trend.last?.trend {
+                                MilestonePanel(startKg: start, goalKg: goal, currentKg: current)
+                            }
+                            TrendTilesPanel(points: points)
                             chart
                         }
                         .padding(16)
@@ -38,9 +48,26 @@ struct WeightScreen: View {
             .background(theme.bg)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Add", systemImage: "plus") { entering = true }
+                    Menu {
+                        Button("Add weigh-in", systemImage: "plus") { entering = true }
+                        Button("Goal and milestones", systemImage: "flag") { editingGoal = true }
+                        if HealthKitWeights.isAvailable {
+                            Button("Import from Apple Health", systemImage: "heart") {
+                                Task { await syncHealth() }
+                            }
+                            .disabled(syncing)
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
                 }
             }
+            .alert("Apple Health", isPresented: syncAlert) {
+                Button("OK") { syncMessage = nil }
+            } message: {
+                Text(syncMessage ?? "")
+            }
+            .sheet(isPresented: $editingGoal) { GoalSheet() }
             .sheet(isPresented: $entering) {
                 WeighInSheet { weighIn in
                     Task {
@@ -136,6 +163,26 @@ struct WeightScreen: View {
         dayNumber(day).map { Date(timeIntervalSince1970: Double($0) * 86_400) }
     }
 
+    private var syncAlert: Binding<Bool> {
+        Binding(get: { syncMessage != nil }, set: { if !$0 { syncMessage = nil } })
+    }
+
+    private func syncHealth() async {
+        guard let store else { return }
+        syncing = true
+        defer { syncing = false }
+        do {
+            let result = try await HealthKitWeights().sync(into: store)
+            await load()
+            syncMessage = result.added == 0 && result.skipped == 0
+                ? "No weight samples found in Health."
+                : "Imported \(result.added) weigh-in\(result.added == 1 ? "" : "s")."
+                    + (result.skipped > 0 ? " \(result.skipped) day\(result.skipped == 1 ? "" : "s") already recorded, left alone." : "")
+        } catch {
+            syncMessage = error.localizedDescription
+        }
+    }
+
     private func load() async {
         guard let store else { loaded = true; return }
         points = (try? await store.weightPoints()) ?? []
@@ -197,6 +244,76 @@ private struct WeighInSheet: View {
             components.year ?? 0, components.month ?? 0, components.day ?? 0
         )
         onSave(WeighIn(measuredOn: measuredOn, kg: kg))
+        dismiss()
+    }
+}
+
+/// Goal, target rate and how many waypoints to break the journey into.
+private struct GoalSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AppSettings.self) private var settings
+
+    @State private var goalText = ""
+    @State private var rateText = ""
+    @State private var count = 10
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack {
+                        TextField("Goal weight", text: $goalText)
+                            .keyboardType(.decimalPad)
+                            .monospacedDigit()
+                        Text(settings.weightUnit.suffix).foregroundStyle(.secondary)
+                    }
+                    Stepper("Milestones: \(count)", value: $count, in: 1...20)
+                } footer: {
+                    Text("Milestones are evenly spaced between your first weigh-in and your goal. The next one is usually closer than the goal, which is the point of them.")
+                }
+
+                Section {
+                    HStack {
+                        TextField("Target rate", text: $rateText)
+                            .keyboardType(.decimalPad)
+                            .monospacedDigit()
+                        Text("\(settings.weightUnit.suffix)/week").foregroundStyle(.secondary)
+                    }
+                } footer: {
+                    Text("Optional. The rate you are aiming for, so forecasts can be run against it as well as against the rate you are actually achieving.")
+                }
+            }
+            .navigationTitle("Goal")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save() }
+                }
+            }
+        }
+        .onAppear {
+            if let goal = settings.goalKg {
+                goalText = String(format: "%.1f", settings.weightUnit.convert(goal))
+            }
+            if let rate = settings.commitmentKgPerWeek {
+                rateText = String(format: "%.2f", settings.weightUnit.convert(rate))
+            }
+            count = settings.milestoneCount
+        }
+    }
+
+    private func save() {
+        let goal = Double(goalText.replacingOccurrences(of: ",", with: ".")).map {
+            settings.weightUnit.toKilograms($0)
+        }
+        // A rate is a difference, so it converts by scale alone.
+        let rate = Double(rateText.replacingOccurrences(of: ",", with: ".")).map {
+            settings.weightUnit.toKilograms($0)
+        }
+        settings.setGoal(kg: goal, commitmentKgPerWeek: rate.map { -abs($0) }, milestoneCount: count)
         dismiss()
     }
 }

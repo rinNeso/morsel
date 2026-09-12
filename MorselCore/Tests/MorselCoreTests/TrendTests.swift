@@ -137,3 +137,90 @@ struct CalendarMath {
         #expect(dayNumber("not-a-date") == nil, "garbage parses to nil")
     }
 }
+
+@Suite("Progress readouts")
+struct ProgressReadouts {
+    /// A steady loss with one absurd reading in the middle, to show what each
+    /// approach does with a single bad morning.
+    private func noisyLoss() -> [WeightPoint] {
+        let base = dayNumber("2026-03-01")!
+        return (0..<30).map { day in
+            var kg = 90.0 - (0.5 / 7) * Double(day)
+            if day == 29 { kg += 1.5 } // a heavy dinner the night before
+            return WeightPoint(date: dayString(base + day), kg: kg)
+        }
+    }
+
+    @Test("a single bad morning barely moves the trend delta")
+    func trendDeltaResistsNoise() throws {
+        let points = noisyLoss()
+        let weekly = try #require(trendChange(points, overDays: 7))
+
+        // Raw endpoints would read this as a *gain*, because the last morning
+        // was 1.5 kg up. The trend still sees the fortnight of losing.
+        let rawWeekly = points.last!.kg - points[points.count - 8].kg
+        #expect(rawWeekly > 0, "raw endpoints invent a gain from one heavy day")
+        #expect(weekly < 0, "the trend still reports the loss that actually happened")
+    }
+
+    @Test("a real gain still reports as a gain")
+    func realGainStillShows() throws {
+        let base = dayNumber("2026-03-01")!
+        let gaining = (0..<30).map { day in
+            WeightPoint(date: dayString(base + day), kg: 90.0 + (0.4 / 7) * Double(day))
+        }
+        let change = try #require(trendChange(gaining, overDays: 14))
+        #expect(change > 0, "smoothing does not hide a direction that is real")
+    }
+
+    @Test("a window longer than the data returns nothing rather than a truncated answer")
+    func windowBeyondData() {
+        let base = dayNumber("2026-03-01")!
+        let short = (0..<5).map { WeightPoint(date: dayString(base + $0), kg: 90.0) }
+        #expect(trendChange(short, overDays: 90) == nil)
+    }
+
+    @Test("all-time change spans the whole series")
+    func allTime() throws {
+        let change = try #require(trendChangeAllTime(noisyLoss()))
+        #expect(change < 0)
+    }
+
+    @Test("milestones are evenly spaced and know which are behind you")
+    func milestoneSpacing() {
+        let all = milestones(startKg: 90, goalKg: 80, count: 5, currentKg: 85.5)
+        #expect(all.count == 5)
+        #expect(all.map(\.targetKg) == [88, 86, 84, 82, 80])
+        #expect(all.filter(\.reached).count == 2, "88 and 86 are behind; 84 is not")
+    }
+
+    @Test("milestones work when the goal is above the start")
+    func milestonesGainingDirection() {
+        let all = milestones(startKg: 60, goalKg: 70, count: 4, currentKg: 65.5)
+        #expect(all.map(\.targetKg) == [62.5, 65, 67.5, 70])
+        #expect(all.filter(\.reached).count == 2)
+    }
+
+    @Test("degenerate milestone requests produce nothing rather than nonsense")
+    func milestoneEdges() {
+        #expect(milestones(startKg: 90, goalKg: 90, count: 5, currentKg: 90).isEmpty)
+        #expect(milestones(startKg: 90, goalKg: 80, count: 0, currentKg: 85).isEmpty)
+    }
+
+    @Test("forecasting projects the trend forward at the measured rate")
+    func forecast() throws {
+        let base = dayNumber("2026-03-01")!
+        // Exactly -0.7 kg/week, so the arithmetic is checkable by hand.
+        let clean = (0..<30).map { day in
+            WeightPoint(date: dayString(base + day), kg: 90.0 - 0.1 * Double(day))
+        }
+        let today = try #require(ewmaTrend(clean).last?.trend)
+        let week = try #require(forecastWeight(clean, daysAhead: 7))
+        #expect(abs((today - week) - 0.7) < 0.01, "seven days at 0.1/day is 0.7")
+    }
+
+    @Test("no forecast without enough data to establish a rate")
+    func forecastNeedsData() {
+        #expect(forecastWeight([], daysAhead: 7) == nil)
+    }
+}

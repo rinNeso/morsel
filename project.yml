@@ -35,6 +35,13 @@ targets:
         product: MorselCore
       - package: MorselCore
         product: MorselData
+      - sdk: HealthKit.framework
+    entitlements:
+      path: App/Morsel.entitlements
+      properties:
+        # Allowed on a free personal team — unlike push, which is what broke
+        # signing on the React Native build.
+        com.apple.developer.healthkit: true
     info:
       path: App/Info.plist
       properties:
@@ -48,10 +55,12 @@ targets:
         # backgrounding costs nothing and the hack (an App Store rejection
         # risk) is no longer needed.
         #
-        # HealthKit/camera usage strings are added when v2/v3 actually need
-        # them. The RN project front-loaded every permission because adding a
-        # native module later meant a whole rebuild cycle; in a native project
-        # that cost is gone, so there's no reason to request what we don't use.
+        # Read-only: Morsel charts weight recorded elsewhere and does not write
+        # back. Camera and the HealthKit *write* permission arrive if and when
+        # something actually needs them.
+        NSHealthShareUsageDescription: >-
+          Morsel reads your weight history from Health so it can chart your
+          trend alongside your meals.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.rinneso.morsel

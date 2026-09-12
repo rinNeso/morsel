@@ -66,6 +66,13 @@ final class AppSettings {
 
     private(set) var weightUnit: WeightUnit = .lb
 
+    /// Where you're headed. Nil until set — milestones and a goal date have
+    /// nothing to say without it.
+    private(set) var goalKg: Double?
+    /// The rate you're aiming for, as opposed to the one you're achieving.
+    private(set) var commitmentKgPerWeek: Double?
+    private(set) var milestoneCount: Int = 10
+
     /// What the resting ring actually draws with.
     var resolvedRestingColor: Color { restingColor ?? accent }
 
@@ -75,6 +82,9 @@ final class AppSettings {
     private static let themeKey = "theme_mode"
     private static let restingKey = "resting_color"
     private static let weightUnitKey = "weight_unit"
+    private static let goalKey = "goal_kg"
+    private static let commitmentKey = "commitment_kg_per_week"
+    private static let milestoneCountKey = "milestone_count"
     /// Sentinel for "follow the accent", so the stored value distinguishes
     /// "deliberately following" from "never set".
     private static let matchAccent = "match"
@@ -97,6 +107,11 @@ final class AppSettings {
         if let raw = try? await store.setting(Self.weightUnitKey), let unit = WeightUnit(rawValue: raw) {
             weightUnit = unit
         }
+        if let raw = try? await store.setting(Self.goalKey) { goalKg = Double(raw) }
+        if let raw = try? await store.setting(Self.commitmentKey) { commitmentKgPerWeek = Double(raw) }
+        if let raw = try? await store.setting(Self.milestoneCountKey), let count = Int(raw) {
+            milestoneCount = count
+        }
     }
 
     func setAccent(_ color: Color) {
@@ -118,6 +133,19 @@ final class AppSettings {
             themeMode = mode
         }
         Task { try? await store?.setSetting(Self.themeKey, to: mode.rawValue) }
+    }
+
+    func setGoal(kg: Double?, commitmentKgPerWeek: Double?, milestoneCount: Int) {
+        goalKg = kg
+        self.commitmentKgPerWeek = commitmentKgPerWeek
+        self.milestoneCount = max(1, milestoneCount)
+        let count = self.milestoneCount
+        Task { [weak self] in
+            guard let store = self?.store else { return }
+            try? await store.setSetting(Self.goalKey, to: kg.map { "\($0)" } ?? "")
+            try? await store.setSetting(Self.commitmentKey, to: commitmentKgPerWeek.map { "\($0)" } ?? "")
+            try? await store.setSetting(Self.milestoneCountKey, to: "\(count)")
+        }
     }
 
     func setWeightUnit(_ unit: WeightUnit) {

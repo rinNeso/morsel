@@ -118,8 +118,17 @@ accent is user-chosen and red is allowed — picking it is *their* call, not the
 defaulting to it or an assistant quietly restoring it. The resting colour is also
 user-chosen and follows the accent unless set separately, so amber is a starting
 point rather than a rule. Paused stays fixed grey: "nothing is happening" is not a
-matter of taste. What must not be quietly reversed is the *reporting, not judging*
-posture and the fact that these are settings rather than hardcoded opinions.
+matter of taste.
+
+**Weight figures may use red for a gain.** A second explicit owner override
+(2026-09-13), extending the first: the weight trend tiles colour losses green and
+gains red, as Happy Scale does. The argument that carried it is that a
+*trend-derived* gain is a real signal rather than scale noise, so the colour is
+reporting something true. Do not strip this out on the strength of the rule above.
+
+What must not be quietly reversed is the *reporting, not judging* posture, and the
+fact that these are settings rather than hardcoded opinions. No streak shaming, no
+"you exceeded your goal", nothing that editorialises beyond stating the number.
 
 **Apple's Human Interface Guidelines are the default authority for anything visual.**
 If a request contradicts current HIG, say so and link the specific guidance so the
