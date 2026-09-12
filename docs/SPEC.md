@@ -2,6 +2,22 @@
 
 Working name; easy to change. Personal, single-user, local-first iOS app.
 
+## Design north star
+
+**Indistinguishable from Apple's own work, but with Android-level
+customization underneath.**
+
+> I want someone or even me to open the app and go "Wow this wasn't made by
+> Apple themselves?" I want it to appear as native as possible but also have
+> the customization options of Android.
+
+Native-feeling chrome and interaction patterns by default (Apple's Human
+Interface Guidelines are the tiebreaker for anything visible or structural),
+with deep user-facing customization layered on top rather than baked into
+fixed defaults. A new visual feature should satisfy both halves: does the
+default state look like it could ship from Apple, and is there a real
+customization surface for the owner to tune it further.
+
 ## Why this app exists
 
 The premise is that eating fast defeats satiety signalling — fullness takes roughly

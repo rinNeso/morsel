@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Animated, Easing, Pressable, StyleSheet, Text, View, useColorScheme, ScrollView,
+  Animated, Easing, Pressable, StyleSheet, Text, View, ScrollView,
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useMealTimer, TICK_MS } from "../hooks/useMealTimer.ts";
+import { useTheme, mmss, TAB_BAR_CLEARANCE } from "../theme.ts";
 
 const REST_PRESETS = [15, 20, 30, 45, 60];
 const RING = 280;
@@ -15,31 +16,8 @@ const CIRC = 2 * Math.PI * RADIUS;
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-function palette(dark: boolean) {
-  return {
-    bg: dark ? "#12100E" : "#FBF8F4",
-    card: dark ? "#1E1B18" : "#FFFFFF",
-    text: dark ? "#F2EEE8" : "#22201D",
-    dim: dark ? "#9A9187" : "#7A736B",
-    track: dark ? "#2C2823" : "#EAE3D9",
-    // Green = permission to eat. Amber = rest in progress. Never red: this app
-    // reports, it does not scold.
-    ready: "#4C9A5E",
-    resting: "#C98B3A",
-    paused: dark ? "#5A544C" : "#B5ADA2",
-  };
-}
-
-function mmss(ms: number): string {
-  const total = Math.round(ms / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
 export default function TimerScreen() {
-  const dark = useColorScheme() === "dark";
-  const c = useMemo(() => palette(dark), [dark]);
+  const c = useTheme();
   const [restSec, setRestSec] = useState(30);
   const t = useMealTimer(restSec * 1000);
 
@@ -64,7 +42,7 @@ export default function TimerScreen() {
 
   if (phase === "idle") {
     return (
-      <SafeAreaView style={[s.root, { backgroundColor: c.bg }]}>
+      <SafeAreaView style={[s.root, { backgroundColor: c.bg }]} edges={["top", "left", "right"]}>
         <View style={s.center}>
           <Text style={[s.h1, { color: c.text }]}>Morsel</Text>
           <Text style={[s.sub, { color: c.dim }]}>
@@ -104,7 +82,7 @@ export default function TimerScreen() {
   if (phase === "ended") {
     const drift = summary.paceDrift;
     return (
-      <SafeAreaView style={[s.root, { backgroundColor: c.bg }]}>
+      <SafeAreaView style={[s.root, { backgroundColor: c.bg }]} edges={["top", "left", "right"]}>
         <ScrollView contentContainerStyle={s.center}>
           <Text style={[s.h1, { color: c.text }]}>Meal complete</Text>
           <View style={[s.card, { backgroundColor: c.card }]}>
@@ -140,7 +118,7 @@ export default function TimerScreen() {
   }
 
   return (
-    <SafeAreaView style={[s.root, { backgroundColor: c.bg }]}>
+    <SafeAreaView style={[s.root, { backgroundColor: c.bg }]} edges={["top", "left", "right"]}>
       <View style={s.header}>
         <Text style={[s.stat, { color: c.dim }]}>{biteCount} bites</Text>
         <View style={s.durationBlock}>
@@ -206,7 +184,7 @@ export default function TimerScreen() {
   );
 }
 
-function Row({ c, k, v }: { c: ReturnType<typeof palette>; k: string; v: string }) {
+function Row({ c, k, v }: { c: ReturnType<typeof useTheme>; k: string; v: string }) {
   return (
     <View style={s.row}>
       <Text style={[s.rowKey, { color: c.dim }]}>{k}</Text>
@@ -217,11 +195,11 @@ function Row({ c, k, v }: { c: ReturnType<typeof palette>; k: string; v: string 
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 16 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, paddingBottom: TAB_BAR_CLEARANCE, gap: 16 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingHorizontal: 28, paddingTop: 8 },
   durationBlock: { alignItems: "flex-end" },
   durationLabel: { fontSize: 10, letterSpacing: 0.4, marginTop: 1 },
-  footer: { flexDirection: "row", justifyContent: "center", gap: 12, padding: 24 },
+  footer: { flexDirection: "row", justifyContent: "center", gap: 12, padding: 24, paddingBottom: TAB_BAR_CLEARANCE },
   h1: { fontSize: 34, fontWeight: "700", letterSpacing: -0.5 },
   sub: { fontSize: 15, textAlign: "center" },
   label: { fontSize: 12, fontWeight: "600", letterSpacing: 1.2, marginTop: 24 },

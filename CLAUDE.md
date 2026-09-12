@@ -92,6 +92,12 @@ confidence interval straddling zero. Do not "simplify" this to a single date.
 resting, grey means paused. The app reports; it does not judge. Same rule applies to
 any nutrition features: no streak shaming, no "you exceeded your goal".
 
+Exception, decided by the owner: the "ready" color becomes user-customizable
+(#12), and the owner explicitly chose to allow red as a pickable accent —
+picking it is *their* call, not the app defaulting to it or an assistant
+quietly restoring it. Resting (amber) and paused (grey) are unaffected and
+stay fixed regardless of the chosen accent.
+
 ## Environment traps already hit
 
 - **`create-expo-app` does not work here.** Arch ships npm 12, which changed the

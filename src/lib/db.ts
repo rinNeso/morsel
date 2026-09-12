@@ -47,6 +47,11 @@ function getDb(): Promise<SQLite.SQLiteDatabase> {
           interval_s REAL
         );
         CREATE INDEX IF NOT EXISTS bite_meal_idx ON bite(meal_id, seq);
+
+        CREATE TABLE IF NOT EXISTS setting (
+          key   TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        );
       `);
       return db;
     });
@@ -56,6 +61,10 @@ function getDb(): Promise<SQLite.SQLiteDatabase> {
 
 function toIso(ms: number): string {
   return new Date(ms).toISOString();
+}
+
+function fromIso(iso: string): number {
+  return new Date(iso).getTime();
 }
 
 /** Called on the idle -> ready transition that only START produces. */
@@ -91,5 +100,81 @@ export async function endMeal(mealId: number, endedAt: number, pausedMs: number)
     toIso(endedAt),
     Math.round(pausedMs / 1000),
     mealId,
+  );
+}
+
+export interface MealHistoryRow {
+  id: number;
+  startedAt: number;
+  durationMs: number;
+  pausedMs: number;
+  biteCount: number;
+  meanRestMs: number | null;
+  /** Bites confirmed before the cue fired, per bite.early in mealTimer.ts. */
+  earlyBites: number;
+  fullness: number | null;
+}
+
+/** Completed meals, most recent first. */
+export async function listMeals(limit = 100): Promise<MealHistoryRow[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{
+    id: number;
+    started_at: string;
+    ended_at: string;
+    bite_count: number;
+    paused_s: number;
+    fullness_after: number | null;
+    mean_rest_s: number | null;
+    early_bites: number;
+  }>(
+    `SELECT
+       m.id, m.started_at, m.ended_at, m.bite_count, m.paused_s, m.fullness_after,
+       AVG(b.interval_s) AS mean_rest_s,
+       -- An early bite is confirmed the instant it's cued (before the rest
+       -- window elapses) — see mealTimer.ts CONFIRM_BITE, where an early
+       -- bite's cued_at and taken_at land on the same timestamp.
+       SUM(CASE WHEN b.taken_at = b.cued_at THEN 1 ELSE 0 END) AS early_bites
+     FROM meal m
+     LEFT JOIN bite b ON b.meal_id = m.id
+     WHERE m.ended_at IS NOT NULL
+     GROUP BY m.id
+     ORDER BY m.started_at DESC
+     LIMIT ?`,
+    limit,
+  );
+
+  return rows.map((r) => {
+    const startedAt = fromIso(r.started_at);
+    const endedAt = fromIso(r.ended_at);
+    return {
+      id: r.id,
+      startedAt,
+      durationMs: Math.max(0, endedAt - startedAt - r.paused_s * 1000),
+      pausedMs: r.paused_s * 1000,
+      biteCount: r.bite_count,
+      meanRestMs: r.mean_rest_s !== null ? r.mean_rest_s * 1000 : null,
+      earlyBites: r.early_bites,
+      fullness: r.fullness_after,
+    };
+  });
+}
+
+export async function getSetting(key: string): Promise<string | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ value: string }>(
+    `SELECT value FROM setting WHERE key = ?`,
+    key,
+  );
+  return row?.value ?? null;
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `INSERT INTO setting (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    key,
+    value,
   );
 }

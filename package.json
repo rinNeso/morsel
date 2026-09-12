@@ -11,8 +11,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
     "@kingstinct/react-native-healthkit": "^15.1.0",
     "expo": "~57.0.22",
+    "expo-blur": "~57.0.3",
     "expo-camera": "~57.0.5",
     "expo-dev-client": "~57.0.19",
     "expo-haptics": "~57.0.3",
