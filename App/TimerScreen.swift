@@ -211,6 +211,7 @@ struct TimerScreen: View {
                 .background(theme.card, in: .rect(cornerRadius: 16))
 
                 fullnessRating
+                mealNutrition
 
                 Button("Done") { model.send(.reset) }
                     .buttonStyle(.borderedProminent)
@@ -260,6 +261,43 @@ struct TimerScreen: View {
             }
             .font(.caption2)
             .foregroundStyle(theme.dim)
+        }
+    }
+
+    /// The crude version of v3. A flat calorie total is what the correlation
+    /// actually needs — fullness at a given calorie load — so capturing it now
+    /// keeps today's meals usable later, even before real food logging exists.
+    private var mealNutrition: some View {
+        @Bindable var model = model
+        return VStack(spacing: 10) {
+            Text("WHAT DID YOU EAT?")
+                .font(.caption.weight(.semibold))
+                .kerning(1.2)
+                .foregroundStyle(theme.dim)
+
+            TextField("Sandwich, coffee…", text: $model.mealNotes, axis: .vertical)
+                .textFieldStyle(.plain)
+                .lineLimit(1...3)
+                .padding(12)
+                .background(theme.card, in: .rect(cornerRadius: 12))
+                .onChange(of: model.mealNotes) { _, _ in model.saveNutrition() }
+
+            HStack {
+                TextField("Calories", text: $model.kcalText)
+                    .keyboardType(.numberPad)
+                    .textFieldStyle(.plain)
+                    .monospacedDigit()
+                    .onChange(of: model.kcalText) { _, _ in model.saveNutrition() }
+                Text("kcal")
+                    .foregroundStyle(theme.dim)
+            }
+            .padding(12)
+            .background(theme.card, in: .rect(cornerRadius: 12))
+
+            Text("Optional, and rough is fine — a number you half-remember beats no number at all.")
+                .font(.caption2)
+                .foregroundStyle(theme.dim)
+                .multilineTextAlignment(.center)
         }
     }
 

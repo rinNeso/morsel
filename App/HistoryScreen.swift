@@ -262,6 +262,14 @@ private struct MealRow: View {
                 stat(meal.meanRestMs.map { "\(Int(($0 / 1000).rounded()))s" } ?? "—", "avg pace")
                 stat("\(meal.earlyBites)", "early")
                 stat(meal.fullness.map { "\($0)/10" } ?? "—", "fullness")
+                stat(meal.kcal.map { "\($0)" } ?? "—", "kcal")
+            }
+
+            if let notes = meal.notes, !notes.isEmpty {
+                Text(notes)
+                    .font(.footnote)
+                    .foregroundStyle(theme.dim)
+                    .lineLimit(2)
             }
         }
         .padding(.vertical, 6)

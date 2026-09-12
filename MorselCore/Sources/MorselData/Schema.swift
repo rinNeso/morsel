@@ -54,6 +54,17 @@ enum Schema {
             }
         }
 
+        // A flat total on the meal, rather than the meal_item/food modelling in
+        // docs/schema.sql that v3 will bring. That breakdown is for logging
+        // convenience; the *total* is what the v4 correlation needs — fullness
+        // at a given calorie load — so this is the minimum that makes the
+        // analysis possible, and v3 can sum its items into the same column.
+        migrator.registerMigration("v2-meal-calories") { db in
+            try db.alter(table: "meal") { t in
+                t.add(column: "kcal", .integer)
+            }
+        }
+
         return migrator
     }
 }

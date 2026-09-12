@@ -61,8 +61,8 @@ extension MealStore {
                     sql: """
                         INSERT INTO meal (
                             started_at, ended_at, label, target_interval_s, target_duration_s,
-                            bite_count, paused_s, hunger_before, fullness_after, notes
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            bite_count, paused_s, hunger_before, fullness_after, kcal, notes
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                     arguments: [
                         meal.startedAt, meal.endedAt, meal.label,
@@ -71,7 +71,7 @@ extension MealStore {
                         // carried in the file, so a count can never disagree
                         // with the rows it is counting.
                         meal.bites.count,
-                        meal.pausedS, meal.hungerBefore, meal.fullnessAfter, meal.notes,
+                        meal.pausedS, meal.hungerBefore, meal.fullnessAfter, meal.kcal, meal.notes,
                     ]
                 )
                 let mealID = db.lastInsertedRowID

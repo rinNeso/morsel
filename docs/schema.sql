@@ -17,6 +17,9 @@ CREATE TABLE meal (
   hunger_before     INTEGER,           -- 1-10, optional
   fullness_after    INTEGER,           -- 1-10, the key feedback signal
   notes             TEXT,
+  -- Flat total, added ahead of the meal_item/food modelling below. The v4
+  -- correlation needs the total, not the breakdown; v3 sums its items here.
+  kcal              INTEGER,
   photo_uri         TEXT
 );
 CREATE INDEX meal_started_idx ON meal(started_at DESC);

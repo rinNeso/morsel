@@ -18,6 +18,13 @@ final class MealTimerModel {
     /// Fullness given on the end-of-meal screen, cleared with the meal.
     private(set) var fullness: Int?
 
+    /// What was eaten. A flat total and free text until v3 brings real food
+    /// logging — but recorded now, because a meal eaten without it is
+    /// incomplete forever.
+    var kcalText: String = ""
+    var mealNotes: String = ""
+
+
     @ObservationIgnored private let store: MealStore?
     @ObservationIgnored private var mealID: Int64?
     /// How many of `state.bites` are already on disk.
@@ -100,6 +107,17 @@ final class MealTimerModel {
         }
     }
 
+    /// Called as the fields are edited on the end-of-meal screen.
+    func saveNutrition() {
+        guard let store else { return }
+        let kcal = Int(kcalText.trimmingCharacters(in: .whitespaces))
+        let notes = mealNotes.trimmingCharacters(in: .whitespaces)
+        enqueueWrite { [weak self] in
+            guard let id = self?.mealID else { return }
+            try? await store.setNutrition(kcal: kcal, notes: notes, mealID: id)
+        }
+    }
+
     private func handle(transitionFrom before: Phase) {
         // Fire the cue exactly once per resting -> ready transition.
         if before == .resting, state.phase == .ready {
@@ -155,6 +173,8 @@ final class MealTimerModel {
             mealID = nil
             fullness = nil
             persistedBites = 0
+            kcalText = ""
+            mealNotes = ""
         }
     }
 

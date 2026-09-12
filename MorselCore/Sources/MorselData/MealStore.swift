@@ -18,6 +18,8 @@ public struct MealHistoryEntry: Sendable, Equatable, Identifiable, FetchableReco
     public let meanRestMs: Double?
     public let earlyBites: Int
     public let fullness: Int?
+    public let kcal: Int?
+    public let notes: String?
 
     public var isFinished: Bool { durationMs != nil }
 }
@@ -99,6 +101,17 @@ public final class MealStore: Sendable {
         }
     }
 
+    /// What was eaten, and roughly how much. Free text and a flat total until
+    /// v3 brings real food logging.
+    public func setNutrition(kcal: Int?, notes: String?, mealID: Int64) async throws {
+        try await dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE meal SET kcal = ?, notes = ? WHERE id = ?",
+                arguments: [kcal, notes?.isEmpty == true ? nil : notes, mealID]
+            )
+        }
+    }
+
     public func setFullness(_ rating: Int, mealID: Int64) async throws {
         try await dbQueue.write { db in
             try db.execute(
@@ -121,6 +134,8 @@ public final class MealStore: Sendable {
                     m.bite_count        AS biteCount,
                     m.paused_s          AS pausedS,
                     m.fullness_after    AS fullness,
+                    m.kcal              AS kcal,
+                    m.notes             AS notes,
                     AVG(b.interval_s)   AS meanRestS,
                     SUM(b.early)        AS earlyBites
                 FROM meal m
@@ -150,7 +165,9 @@ public final class MealStore: Sendable {
                     biteCount: row["biteCount"] ?? 0,
                     meanRestMs: meanRestS.map { $0 * 1000 },
                     earlyBites: row["earlyBites"] as Int? ?? 0,
-                    fullness: row["fullness"]
+                    fullness: row["fullness"],
+                    kcal: row["kcal"],
+                    notes: row["notes"]
                 )
             }
         }
