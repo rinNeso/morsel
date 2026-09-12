@@ -8,6 +8,19 @@ import UIKit
 enum Palette {
     /// The original "ready" green — the intuitive default before any customising.
     static let defaultAccent = Color(rgb: 0x4C9A5E)
+    static let defaultAccentHex = "#4C9A5E"
+
+    /// Starting points offered in Settings, not a limit — the picker takes any
+    /// colour at all.
+    static let accentPresets: [Color] = [
+        defaultAccent,
+        Color(rgb: 0x3B82C4), // blue
+        Color(rgb: 0x7C5CBF), // purple
+        Color(rgb: 0x2E9E96), // teal
+        Color(rgb: 0xD97B29), // orange
+        Color(rgb: 0xC4527A), // pink
+        Color(rgb: 0xC0392B), // red
+    ]
 
     static let bg = dynamic(light: 0xFBF8F4, dark: 0x12100E)
     static let card = dynamic(light: 0xFFFFFF, dark: 0x1E1B18)

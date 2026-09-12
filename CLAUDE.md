@@ -8,46 +8,59 @@ A personal, single-user iOS app for mindful eating. The bite timer is the produc
 the meal journal, calorie log, and weight trends are instrumentation that tell the
 owner whether the timer is working. Local-first, no backend, no account.
 
+Native SwiftUI, iOS 26+. It was React Native / Expo until 2026-09-12; see
+"Why Swift" below before proposing a way back.
+
 Design rationale lives in `docs/SPEC.md`, the data model in `docs/schema.sql`.
 Read the spec before proposing product changes — most obvious ideas were already
-considered and rejected there for stated reasons.
+considered and rejected there for stated reasons. `docs/SPEC.md` opens with the
+design north star, which is the tiebreaker for anything visual.
+
+## Layout
+
+```
+MorselCore/            SwiftPM package — the logic, testable anywhere
+  Sources/MorselCore/  pure: reducer, trend math. NO dependencies, keep it that way
+  Sources/MorselData/  GRDB store, schema, timestamps
+App/                   SwiftUI app target
+project.yml            XcodeGen spec; Morsel.xcodeproj is generated and gitignored
+```
 
 ## Two machines — work out which one you are on first
 
-Both machines now do day-to-day development. The MacBook Pro is additionally the
-only one that can sign and install to the phone.
-
 | | Linux desktop (`/home/nate/Projects/morsel`) | MacBook Pro |
 |---|---|---|
-| Role | day-to-day development | day-to-day development, plus signing and device installs |
-| Can do | edit, typecheck, run tests, `expo export`, `expo start` | everything, plus Xcode |
-| Cannot do | compile iOS, run a simulator, verify haptics | — |
+| Role | logic, tests, review | everything |
+| Can do | `swift test` over `MorselCore/` | build, sign, install, run on device |
+| Cannot do | build or run the app at all — Xcode is macOS-only | — |
+
+This is the real cost of going native, and it was accepted deliberately. It is
+softened by `MorselCore` being a plain SwiftPM package with no Apple-platform
+dependencies: the reducer and the trend math run under `swift test` on Linux with
+no Xcode, so the logic stays reviewable and testable from the desktop. Only the UI
+layer is Mac-bound.
+
+The owner also drives the Mac from Linux via Claude Code's Remote Control
+(`/remote-control` on the Mac, open the URL on Linux). Commands still execute on
+the Mac; it is remote hands, not a second working copy.
 
 GitHub (`rinNeso/morsel`, private) is the only sync path. **Always commit and push
-before the session ends** — the other machine has no other way to see the work.
-Equally, `git pull` before starting.
-
-Xcode is only needed for the first dev client and whenever the **native module list
-changes**. Pure TS/JS changes hot-reload onto the device from Linux over WiFi, so
-do not send the owner to the Mac for something that does not need it.
-
-All native modules the roadmap calls for are already installed and their config
-plugins verified against the generated `Info.plist` — camera, SQLite, notifications,
-haptics, keep-awake, HealthKit. This was deliberate: adding one later costs a trip
-to the Mac. Think hard before adding another, and batch them if you must.
+before the session ends.** Equally, `git pull` before starting.
 
 ## Commands
 
 ```sh
-npm run typecheck                                    # tsc --noEmit
-node --experimental-strip-types src/lib/<x>.test.ts  # run a test suite
-npx expo export --platform ios                       # full bundle check, works on Linux
-npx expo start                                       # dev server; device connects over WiFi
-npx expo prebuild --platform ios --clean             # regenerate ios/, also works on Linux
+cd MorselCore && swift test                 # 26 assertions; works on Linux
+xcodegen generate                           # regenerate Morsel.xcodeproj from project.yml
+xcodebuild -project Morsel.xcodeproj -scheme Morsel -configuration Debug \
+  -destination "id=<device-udid>" -allowProvisioningUpdates build
+xcrun devicectl list devices                # find the phone, check it is reachable
+xcrun devicectl device install app --device <udid> <path-to>/Morsel.app
+xcrun devicectl device process launch --device <udid> com.rinneso.morsel
 ```
 
-`ios/` and `android/` are gitignored on purpose — they are generated. Never commit
-them; regenerate with `prebuild` instead.
+`Morsel.xcodeproj` is gitignored on purpose — it is generated. Never commit or
+hand-edit it; change `project.yml` and regenerate.
 
 ## Decisions that must not be quietly reversed
 
@@ -65,83 +78,108 @@ intervention, not data entry. Do not "improve" this by making it passive or
 automatic.
 
 **Early bites are recorded, not blocked.** Confirming during a rest window is allowed
-and flagged `early`. Impatience is data, not an error state.
+and flagged `early`. Impatience is data, not an error state. It is a real column in
+`bite`, not inferred from `cued_at == taken_at` — that inference happens to hold, but
+only as a coincidence of how the reducer builds an uncued bite.
 
 **All timing derives from wall-clock timestamps; nothing accumulates ticks.** iOS
-suspends JS timers on background and lock, so a tick counter silently loses time and
-makes meal records fiction. `setInterval` exists only to trigger re-renders. If you
-find yourself adding `elapsed += delta`, stop.
+suspends timers on background and lock, so a tick counter silently loses time and
+makes meal records fiction. If you find yourself adding `elapsed += delta`, stop.
+`MealTimerModel` schedules exactly one wake-up for the instant rest completes and
+re-derives from the clock on foreground; it does not poll.
 
-**The reducer in `src/lib/mealTimer.ts` is pure and takes `now` as a parameter.**
-No `Date.now()` inside. This is what makes it testable on Linux with no device and
-no fake timers. Keep new logic in that shape: pure module in `src/lib/`, React
-bindings in `src/hooks/`.
+**The reducer in `MorselCore/Sources/MorselCore/MealTimer.swift` is pure and takes
+`now` as a parameter.** No `Date()` inside. That is what keeps it testable with no
+device and no fake clock, and what lets it run on Linux. Keep new logic in that
+shape: pure code in `MorselCore`, side effects in `App/`.
+
+**`MorselCore` has no dependencies and must keep none.** GRDB and anything else
+belongs in `MorselData` or the app. The moment `MorselCore` gains a dependency, the
+Linux testing story dies.
 
 **Weight trend and weight rate use deliberately different methods.** The display
 line is an EWMA (`ewmaTrend`); the rate of change is OLS on *raw* weights
 (`rateOfChange`). Regressing the smoothed series looks cleaner and is wrong — EWMA
 output is autocorrelated by construction, which collapses apparent residuals and
 manufactures a standard error the data has not earned. There is a comment saying
-this at the top of `src/lib/trend.ts`.
+this at the top of `Trend.swift`.
 
 **Goal projection returns a cone, not a date.** A 14-day window on real bathroom-scale
 noise reads roughly three times the true rate. Plateau detection falls out of the same
 confidence interval straddling zero. Do not "simplify" this to a single date.
 
-**No red in the UI, and no scolding copy.** Green means permission to eat, amber means
-resting, grey means paused. The app reports; it does not judge. Same rule applies to
-any nutrition features: no streak shaming, no "you exceeded your goal".
+**No red in the UI, and no scolding copy.** The accent means permission to eat, amber
+means resting, grey means paused. The app reports; it does not judge. Same rule applies
+to any nutrition features: no streak shaming, no "you exceeded your goal".
 
-Exception, decided by the owner: the "ready" color becomes user-customizable
-(#12), and the owner explicitly chose to allow red as a pickable accent —
-picking it is *their* call, not the app defaulting to it or an assistant
-quietly restoring it. Resting (amber) and paused (grey) are unaffected and
-stay fixed regardless of the chosen accent.
+Exception, decided by the owner: the "ready" colour is user-customisable, and the
+owner explicitly chose to allow red as a pickable accent — picking it is *their*
+call, not the app defaulting to it or an assistant quietly restoring it. Resting
+(amber) and paused (grey) stay fixed regardless of the chosen accent.
+
+**Apple's Human Interface Guidelines are the default authority for anything visual.**
+If a request contradicts current HIG, say so and link the specific guidance so the
+owner can decide, rather than silently following either one. Check the live HIG
+rather than trusting recall — it moves (iOS 26's Liquid Glass materially changed
+tab bar guidance).
+
+## Why Swift
+
+The RN build reimplemented Apple's interactions by hand and always approximately:
+~80 lines of SVG wedges for a colour wheel because react-native-svg has no conic
+gradient, ~150 lines of Animated plumbing for minimize-on-scroll, BlurView faking
+`.glassEffect()`. Natively those are `ColorPicker`, `.tabBarMinimizeBehavior()`, and
+the system tab bar. The owner's verdict on the RN tab bar was "we have apple tab bar
+at home", and the design north star is to be indistinguishable from Apple's own work.
+
+The forcing function was iPhone Duo (#15): its adaptive-layout APIs ship as
+SwiftUI/UIKit in Xcode 27.1, day one, with no third-party wrapper to wait for.
 
 ## Environment traps already hit
 
-- **`create-expo-app` does not work here.** Arch ships npm 12, which changed the
-  `npm pack --dry-run` JSON shape that create-expo-app parses. It fails with
-  "Could not parse JSON" *and still exits 0*. The template was extracted manually
-  from the tarball. Do not try to re-scaffold with it.
-- **`allowImportingTsExtensions` is required** in `tsconfig.json`, and relative
-  imports carry explicit `.ts`/`.tsx` extensions. This is what lets Node's
-  `--experimental-strip-types` run the pure modules as tests with no build step.
-  Do not strip the extensions.
-- **HealthKit is `@kingstinct/react-native-healthkit`**, not `react-native-health` —
-  the latter has been unmaintained since Oct 2024 and predates React 19. The plugin
-  takes **raw `Info.plist` key names** as props (`NSHealthShareUsageDescription`),
-  not Expo's usual `*Permission` convention. Getting this wrong fails silently: the
-  build succeeds and the usage strings fall back to the plugin's generic defaults.
-  After changing any plugin config, run `prebuild` and grep the generated
-  `ios/Morsel/Info.plist` to confirm it actually applied.
-- **`UIBackgroundModes: ["audio"]`** is declared in `app.json` but nothing plays audio
-  yet. It is there to keep the timer alive with the screen locked. Harmless for
-  sideloading; an App Store rejection risk if this is ever published. Flagged to the
-  owner, undecided.
+- **Pin `DEVELOPMENT_TEAM` in `project.yml`.** It is committed deliberately. The RN
+  build lost an hour to `expo prebuild --clean` silently wiping the signing team out
+  of the generated project, producing "Signing for Morsel requires a development
+  team" with no hint why. Recovering it meant digging the team ID out of a cached
+  `.mobileprovision`.
+- **A free Apple ID cannot sign an app requesting the push entitlement.** Personal
+  teams reject `aps-environment` outright. Local notifications never needed it.
+- **A locked phone refuses `devicectl ... process launch`** with
+  `BSErrorCodeDescription = Locked`; install works fine, launch does not. Over WiFi
+  the debug tunnel also drops when the phone sleeps, surfacing as "device
+  disconnected immediately after connecting". Auto-Lock → Never while developing.
+- **Swift 6 strict concurrency is load-bearing here, not ceremony.** It rejected a
+  global `ISO8601DateFormatter` as non-Sendable; replacing it surfaced a real bug
+  underneath — formatting through `Date(timeIntervalSince1970: ms / 1000)` silently
+  shaved a millisecond off some timestamps, because the sub-second part is not
+  exactly representable in binary and the style truncates rather than rounds.
+  Milliseconds are split off with integer arithmetic now. Do not "simplify" that back.
+- **XcodeGen needs each SwiftPM product named explicitly.** A bare `package:` entry
+  links only the product sharing the package's name, so `MorselData` went missing
+  until it was listed on its own.
 - Watch out for `grep`'s exit code masking a command's own when verifying tool output.
 
 ## State
 
-Done: spec, schema, EWMA/OLS weight math (17 assertions), meal timer state machine
-(43 assertions), timer UI, Expo SDK 57 scaffold. Everything typechecks and bundles.
-First dev client built and installed on device from the MacBook — signing works
-end to end, timer UI confirmed running on a real phone.
+Working on device: the timer end to end, SQLite persistence, meal history, accent
+colour and Light/Dark/System. That is parity with what React Native ever shipped.
 
-Never verified: haptics, keep-awake, and whether the 30s default feels right in a
-real meal. Only the owner eating a meal can settle that.
+Never verified: whether the 30s default feels right across real meals. Only the
+owner eating can settle that.
 
-Roadmap and open work are tracked as GitHub Issues (labels `v1-timer` through
-`v4-correlation`), not here — check the issue tracker rather than this file for
-what's next. This section stays for state that isn't a discrete ticket.
+Roadmap and open work are tracked as GitHub Issues on the "Morsel Roadmap" project
+board (labels `v1-timer` through `v5-watch`), not here — check the tracker rather
+than this file for what is next. Anything the owner suggests that gets built should
+get a ticket, even small polish. This section is for state that is not a discrete
+ticket.
 
 ## Conventions
 
-- TypeScript strict. Pure logic in `src/lib/` with a colocated `*.test.ts`; React in
-  `src/hooks/` and `src/screens/`.
-- Tests are plain assertions run by Node's type stripping — no Jest, no test runner
-  to install. Keep it that way unless there is a real reason not to.
-- Store weight in kg and durations in ms internally; convert only for display.
+- Pure logic in `MorselCore` with tests beside it; side effects in `App/`.
+- Tests are swift-testing (`@Test`, `#expect`). `MorselCore` tests must keep running
+  on Linux — no XCTest, no UIKit, no simulator dependency.
+- Store weight in kg and durations in milliseconds internally; convert only for
+  display or persistence.
 - Timestamps are ISO8601 UTC. Weigh-in dates are local `YYYY-MM-DD`, because "which
   day did I weigh in" is a calendar question, not an instant.
 - Commit messages explain *why*, especially when the choice looks odd.

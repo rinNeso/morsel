@@ -4,30 +4,42 @@ A mindful-eating app for iOS. Primarily a bite timer that paces a meal so satiet
 signals have time to arrive; secondarily a meal journal, calorie log, and
 Happy Scale-style weight trend tracker.
 
-Personal, single-user, local-first. See [docs/SPEC.md](docs/SPEC.md) for the design
-and [docs/schema.sql](docs/schema.sql) for the data model.
+Personal, single-user, local-first. Native SwiftUI, iOS 26+. See
+[docs/SPEC.md](docs/SPEC.md) for the design and [docs/schema.sql](docs/schema.sql)
+for the data model.
+
+## Layout
+
+| | |
+|---|---|
+| `MorselCore/Sources/MorselCore` | Pure logic: the meal-timer reducer, weight trend math. No dependencies. |
+| `MorselCore/Sources/MorselData` | SQLite store via GRDB. |
+| `App/` | SwiftUI app. |
+| `project.yml` | XcodeGen spec. `Morsel.xcodeproj` is generated and gitignored. |
 
 ## Development
 
-Day-to-day work happens on Linux; macOS is only needed to sign builds.
+The logic is a plain SwiftPM package, so its tests run anywhere Swift does —
+including Linux, with no Xcode:
 
 ```sh
-npm install
-npx expo start          # then scan the QR with the dev client on the iPhone
+cd MorselCore && swift test
 ```
 
-Run the trend-math tests (no toolchain beyond Node 22 required):
+Building and running the app itself needs Xcode, so macOS only:
 
 ```sh
-node --experimental-strip-types src/lib/trend.test.ts
+xcodegen generate
+xcodebuild -project Morsel.xcodeproj -scheme Morsel -configuration Debug \
+  -destination "id=<device-udid>" -allowProvisioningUpdates build
 ```
 
-### Signing (macOS only)
+Then install and launch on a connected device:
 
 ```sh
-npx expo prebuild       # regenerates ios/ — it is gitignored on purpose
-open ios/*.xcworkspace  # sign and install from Xcode
+xcrun devicectl list devices
+xcrun devicectl device install app --device <udid> <path-to>/Morsel.app
+xcrun devicectl device process launch --device <udid> com.rinneso.morsel
 ```
 
-Only required for the first dev client and whenever the native module list changes.
-Pure JavaScript and TypeScript changes reload on the device straight from Linux.
+The phone must be unlocked to launch a development build.

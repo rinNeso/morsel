@@ -4,6 +4,7 @@ import SwiftUI
 @main
 struct MorselApp: App {
     @State private var timer: MealTimerModel
+    @State private var settings: AppSettings
     private let store: MealStore?
 
     init() {
@@ -12,16 +13,20 @@ struct MorselApp: App {
         let store = try? MealStore(path: MealStore.defaultURL().path(percentEncoded: false))
         self.store = store
         _timer = State(initialValue: MealTimerModel(store: store))
+        _settings = State(initialValue: AppSettings(store: store))
     }
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(timer)
+                .environment(settings)
                 .environment(\.mealStore, store)
-                // One app-wide accent, so making it user-customisable later is
-                // a single value to swap rather than a colour threaded by hand.
-                .tint(Palette.defaultAccent)
+                // One app-wide accent, so every control picks it up without a
+                // colour being threaded through by hand.
+                .tint(settings.accent)
+                .preferredColorScheme(settings.themeMode.colorScheme)
+                .task { await settings.load() }
         }
     }
 }
