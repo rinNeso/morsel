@@ -216,3 +216,76 @@ struct Settings {
         #expect(try await store.setting("accent_color") == "#3B82C4", "upsert replaces rather than duplicating")
     }
 }
+
+@Suite("Resuming an interrupted meal")
+struct Resuming {
+    @Test("a meal with bites comes back mid-rest, timed from the last bite")
+    func resumesMidRest() async throws {
+        let store = try makeStore()
+        let mealID = try await store.createMeal(startedAt: t0, restMs: 30_000)
+
+        var live = MealState(restMs: 30_000).reduced(by: .start(), now: t0)
+        live = live.reduced(by: .confirmBite, now: t0 + 5_000)
+        try await store.insert(bite: live.bites[0], mealID: mealID)
+        live = live.reduced(by: .tick, now: t0 + 36_000)
+        live = live.reduced(by: .confirmBite, now: t0 + 40_000)
+        try await store.insert(bite: live.bites[1], mealID: mealID)
+
+        // The app dies here.
+        let resumed = try #require(try await store.resumableMeal())
+        #expect(resumed.id == mealID)
+        #expect(resumed.state.bites.count == 2, "both bites come back")
+        #expect(resumed.state.phase == .resting)
+        #expect(resumed.state.startedAt == t0)
+
+        // Rest runs from the last confirmation, not from when the app restarted.
+        #expect(resumed.state.remainingRest(now: t0 + 50_000) == 20_000)
+
+        // And a tick after the window has passed promotes it, from the clock alone.
+        let ready = resumed.state.reduced(by: .tick, now: t0 + 90_000)
+        #expect(ready.phase == .ready, "an hour later it is your turn, not still resting")
+    }
+
+    @Test("bite details survive the rebuild")
+    func biteDetailsSurvive() async throws {
+        let store = try makeStore()
+        let mealID = try await store.createMeal(startedAt: t0, restMs: 30_000)
+
+        var live = MealState(restMs: 30_000).reduced(by: .start(), now: t0)
+        live = live.reduced(by: .confirmBite, now: t0 + 8_000)
+        try await store.insert(bite: live.bites[0], mealID: mealID)
+        live = live.reduced(by: .confirmBite, now: t0 + 12_000) // early
+        try await store.insert(bite: live.bites[1], mealID: mealID)
+
+        let resumed = try #require(try await store.resumableMeal())
+        #expect(resumed.state.bites[0].biteMs == 8_000, "time-to-confirm is recovered from the timestamps")
+        #expect(resumed.state.bites[0].early == false)
+        #expect(resumed.state.bites[1].early == true, "impatience is not lost to a restart")
+        #expect(resumed.state.bites[1].restMs == 4_000, "rest actually served is recovered")
+    }
+
+    @Test("a meal started but never confirmed comes back ready")
+    func resumesBeforeFirstBite() async throws {
+        let store = try makeStore()
+        _ = try await store.createMeal(startedAt: t0, restMs: 45_000)
+
+        let resumed = try #require(try await store.resumableMeal())
+        #expect(resumed.state.phase == .ready, "nothing to rest from yet")
+        #expect(resumed.state.restMs == 45_000, "the configured interval is recovered")
+        #expect(resumed.state.bites.isEmpty)
+    }
+
+    @Test("nothing to resume once the meal is ended")
+    func finishedMealsAreNotResumed() async throws {
+        let store = try makeStore()
+        let mealID = try await store.createMeal(startedAt: t0, restMs: 30_000)
+        try await store.endMeal(id: mealID, endedAt: t0 + 60_000, pausedMs: 0)
+
+        #expect(try await store.resumableMeal() == nil)
+    }
+
+    @Test("an empty store has nothing to resume")
+    func emptyStoreResumesNothing() async throws {
+        #expect(try await makeStore().resumableMeal() == nil)
+    }
+}

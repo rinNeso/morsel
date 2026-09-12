@@ -20,6 +20,8 @@ final class MealTimerModel {
 
     @ObservationIgnored private let store: MealStore?
     @ObservationIgnored private var mealID: Int64?
+    /// How many of `state.bites` are already on disk.
+    @ObservationIgnored private var persistedBites = 0
     /// Persistence runs off the main thread, but the writes are order-
     /// dependent — a bite can't be inserted before its meal row exists, and
     /// `bite_count` is last-writer-wins — so they're chained rather than fired
@@ -52,6 +54,32 @@ final class MealTimerModel {
     /// arbitrary amount of time may have passed with no timer running at all.
     func refresh() {
         send(.tick)
+    }
+
+    /// Pick up a meal that was started and never ended.
+    ///
+    /// Without this, killing the app mid-meal stranded the row: history could
+    /// show it but nothing could finish it, and the owner was left with a meal
+    /// they could not interact with. Restoring it into the live timer means a
+    /// meal row always has a timer behind it, so the stranded state stops
+    /// existing rather than merely becoming visible.
+    ///
+    /// Deliberately not a prompt. The timer is the thing to interact with, and
+    /// End meal is already right there if the meal is stale.
+    func restoreInProgressMeal() async {
+        guard let store, state.phase == .idle,
+              let resumed = try? await store.resumableMeal()
+        else { return }
+
+        mealID = resumed.id
+        persistedBites = resumed.state.bites.count
+        restSeconds = max(1, resumed.state.restMs / 1000)
+        // Straight to the tick so the wall clock decides whether the rest
+        // window already elapsed while the app was gone.
+        state = resumed.state.reduced(by: .tick, now: Self.nowMillis())
+
+        UIApplication.shared.isIdleTimerDisabled = isActive
+        scheduleNextTick()
     }
 
     func confirmBite() {
@@ -97,12 +125,18 @@ final class MealTimerModel {
         // in `.ready` is a normal resting -> ready cue.
         if before == .idle, state.phase == .ready, let startedAt = state.startedAt {
             let restMs = state.restMs
+            persistedBites = 0
             enqueueWrite { [weak self] in
                 self?.mealID = try? await store.createMeal(startedAt: startedAt, restMs: restMs)
             }
         }
 
-        if state.phase == .resting, before != .resting, let bite = state.bites.last {
+        // Keyed on the bite count rather than a phase transition. An early bite
+        // is confirmed while already resting, so resting -> resting never
+        // registered as a transition and those bites were silently never
+        // written — losing exactly the impatience the app sets out to record.
+        if state.bites.count > persistedBites, let bite = state.bites.last {
+            persistedBites = state.bites.count
             enqueueWrite { [weak self] in
                 guard let id = self?.mealID else { return }
                 try? await store.insert(bite: bite, mealID: id)
@@ -120,6 +154,7 @@ final class MealTimerModel {
         if state.phase == .idle {
             mealID = nil
             fullness = nil
+            persistedBites = 0
         }
     }
 

@@ -156,6 +156,71 @@ public final class MealStore: Sendable {
         }
     }
 
+    /// A meal that was started and never ended, rebuilt into live timer state.
+    ///
+    /// The reducer is pure and derives everything from timestamps, which is
+    /// exactly what makes this possible: the stored bites carry their own
+    /// times, so the state reconstructs rather than being approximated.
+    ///
+    /// One known loss. Pauses are only recorded as a total when the meal ends,
+    /// so a meal interrupted while paused comes back with no pause history and
+    /// reads slightly longer than it truly was. Persisting individual pause
+    /// spans would fix it and is not worth the extra table yet.
+    public func resumableMeal() async throws -> (id: Int64, state: MealState)? {
+        try await dbQueue.read { db in
+            guard let mealRow = try Row.fetchOne(db, sql: """
+                SELECT id, started_at, target_interval_s
+                FROM meal
+                WHERE ended_at IS NULL
+                ORDER BY started_at DESC
+                LIMIT 1
+                """),
+                let started = millis(fromISO: mealRow["started_at"])
+            else { return nil }
+
+            let id: Int64 = mealRow["id"]
+            let restMs = (mealRow["target_interval_s"] as Int? ?? 30) * 1000
+
+            let bites: [BiteRecord] = try Row
+                .fetchAll(db, sql: """
+                    SELECT seq, cued_at, taken_at, interval_s, early
+                    FROM bite WHERE meal_id = ? ORDER BY seq ASC
+                    """, arguments: [id])
+                .compactMap { row in
+                    guard let cued = millis(fromISO: row["cued_at"]),
+                          let takenText = row["taken_at"] as String?,
+                          let taken = millis(fromISO: takenText)
+                    else { return nil }
+                    return BiteRecord(
+                        seq: row["seq"],
+                        cuedAt: cued,
+                        takenAt: taken,
+                        biteMs: max(0, taken - cued),
+                        restMs: (row["interval_s"] as Double?).map { Millis($0 * 1000) },
+                        early: row["early"] ?? false
+                    )
+                }
+
+            var state = MealState(restMs: restMs)
+            state.startedAt = started
+            state.bites = bites
+
+            if let last = bites.last {
+                // Mid-meal: the rest window runs from the last confirmation.
+                // Whether it has already elapsed is for the caller's next tick
+                // to decide, from the wall clock.
+                state.phase = .resting
+                state.restStartedAt = last.takenAt
+            } else {
+                // Started but never confirmed a bite.
+                state.phase = .ready
+                state.readyAt = started
+            }
+
+            return (id, state)
+        }
+    }
+
     public func biteCount(forMeal id: Int64) async throws -> Int {
         try await dbQueue.read { db in
             try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM bite WHERE meal_id = ?", arguments: [id]) ?? 0

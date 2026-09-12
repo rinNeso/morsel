@@ -27,7 +27,12 @@ struct MorselApp: App {
                 .tint(settings.accent)
                 .preferredColorScheme(settings.themeMode.colorScheme)
                 .devLogging()
-                .task { await settings.load() }
+                .task {
+                    await settings.load()
+                    // Before anything else can start a meal: a row with no
+                    // timer behind it is the bug this prevents.
+                    await timer.restoreInProgressMeal()
+                }
         }
     }
 }
