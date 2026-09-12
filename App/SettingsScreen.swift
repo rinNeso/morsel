@@ -70,13 +70,13 @@ struct SettingsScreen: View {
                             item: ExportedData(store: store),
                             preview: SharePreview("Morsel data", image: Image(systemName: "square.and.arrow.up"))
                         ) {
-                            Label("Export data", systemImage: "square.and.arrow.up")
+                            BackupLabel("Export data", symbol: "square.and.arrow.up")
                         }
                     }
                     Button {
                         importing = true
                     } label: {
-                        Label("Import data", systemImage: "square.and.arrow.down")
+                        BackupLabel("Import data", symbol: "square.and.arrow.down")
                     }
                     .disabled(store == nil)
                 } header: {
@@ -153,6 +153,35 @@ struct SettingsScreen: View {
 
     private var restingBinding: Binding<Color> {
         Binding(get: { settings.resolvedRestingColor }, set: { settings.setRestingColor($0) })
+    }
+}
+
+/// Export and import sit next to each other, so their icons have to line up.
+///
+/// Two things push them out on their own. The rows are different containers — a
+/// ShareLink and a Button — which do not lay their labels out identically. And
+/// although `square.and.arrow.up` and `square.and.arrow.down` measure the same
+/// 19x22 box, their ink sits differently inside it: the up arrow protrudes
+/// above the square where the down arrow tucks against it, so their optical
+/// centres disagree even when their frames do not.
+///
+/// Pinning both to one frame, centred, takes both variables out.
+private struct BackupLabel: View {
+    private let title: String
+    private let symbol: String
+
+    init(_ title: String, symbol: String) {
+        self.title = title
+        self.symbol = symbol
+    }
+
+    var body: some View {
+        Label {
+            Text(title)
+        } icon: {
+            Image(systemName: symbol)
+                .frame(width: 22, height: 22)
+        }
     }
 }
 
