@@ -68,7 +68,7 @@ export default function TimerScreen() {
         <View style={s.center}>
           <Text style={[s.h1, { color: c.text }]}>Morsel</Text>
           <Text style={[s.sub, { color: c.dim }]}>
-            Put the utensil down after every bite, then tap.
+            Put your food down after every bite, then tap.
           </Text>
 
           <Text style={[s.label, { color: c.dim }]}>REST BETWEEN BITES</Text>
@@ -143,7 +143,10 @@ export default function TimerScreen() {
     <SafeAreaView style={[s.root, { backgroundColor: c.bg }]}>
       <View style={s.header}>
         <Text style={[s.stat, { color: c.dim }]}>{biteCount} bites</Text>
-        <Text style={[s.stat, { color: c.dim }]}>{mmss(elapsedMs)}</Text>
+        <View style={s.durationBlock}>
+          <Text style={[s.stat, { color: c.dim }]}>{mmss(elapsedMs)}</Text>
+          <Text style={[s.durationLabel, { color: c.dim }]}>meal duration</Text>
+        </View>
       </View>
 
       {/* The ring is the tap target: a large, unmissable surface you can hit
@@ -177,7 +180,7 @@ export default function TimerScreen() {
           ) : (
             <>
               <Text style={[s.countdown, { color: c.text }]}>{Math.ceil(remainingMs / 1000)}</Text>
-              <Text style={[s.sub, { color: c.dim }]}>utensil down</Text>
+              <Text style={[s.sub, { color: c.dim }]}>food down</Text>
             </>
           )}
         </View>
@@ -215,7 +218,9 @@ function Row({ c, k, v }: { c: ReturnType<typeof palette>; k: string; v: string 
 const s = StyleSheet.create({
   root: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 16 },
-  header: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 28, paddingTop: 8 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingHorizontal: 28, paddingTop: 8 },
+  durationBlock: { alignItems: "flex-end" },
+  durationLabel: { fontSize: 10, letterSpacing: 0.4, marginTop: 1 },
   footer: { flexDirection: "row", justifyContent: "center", gap: 12, padding: 24 },
   h1: { fontSize: 34, fontWeight: "700", letterSpacing: -0.5 },
   sub: { fontSize: 15, textAlign: "center" },

@@ -70,9 +70,10 @@ Design decisions worth stating:
   you can't pause instantly gets abandoned. Paused time is tracked separately so
   meal duration stats stay honest.
 - **Confirmation is required, and the friction is the point.** The tap is not
-  logging overhead; it is the intervention. It marks that the utensil went down,
-  which is the behaviour being trained. That reframing is why the interaction
-  cost is acceptable where it would not be for ordinary data entry.
+  logging overhead; it is the intervention. It marks that the food went back
+  down — utensil, sandwich, whatever it is — which is the behaviour being
+  trained. That reframing is why the interaction cost is acceptable where it
+  would not be for ordinary data entry.
 - **Rest starts on confirmation, not on the cue.** This follows directly from the
   above. A fixed-cadence metronome would keep cueing while you were still chewing,
   so a slow chew would consume its own rest period — penalising exactly the

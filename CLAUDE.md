@@ -60,8 +60,9 @@ its own rest window — penalising the exact behaviour being trained. The config
 interval is a *minimum rest between bites*. Meal duration is an outcome, not an input.
 
 **Confirming each bite is required, and the friction is intentional.** The tap marks
-that the utensil went down; it is the intervention, not data entry. Do not "improve"
-this by making it passive or automatic.
+that the food went back down — utensil, sandwich, whatever it is — it is the
+intervention, not data entry. Do not "improve" this by making it passive or
+automatic.
 
 **Early bites are recorded, not blocked.** Confirming during a rest window is allowed
 and flagged `early`. Impatience is data, not an error state.
