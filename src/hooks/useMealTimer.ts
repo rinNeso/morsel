@@ -11,7 +11,7 @@ import type { Event, MealState, Phase } from "../lib/mealTimer.ts";
 
 const KEEP_AWAKE_TAG = "morsel-meal";
 /** UI refresh rate. Smooth enough for the ring; nowhere near the timing source. */
-const TICK_MS = 100;
+export const TICK_MS = 100;
 
 function isActive(phase: Phase): boolean {
   return phase === "ready" || phase === "resting" || phase === "paused";

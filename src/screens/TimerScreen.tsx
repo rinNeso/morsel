@@ -1,17 +1,19 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Pressable, StyleSheet, Text, View, useColorScheme, ScrollView,
+  Animated, Easing, Pressable, StyleSheet, Text, View, useColorScheme, ScrollView,
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useMealTimer } from "../hooks/useMealTimer.ts";
+import { useMealTimer, TICK_MS } from "../hooks/useMealTimer.ts";
 
 const REST_PRESETS = [15, 20, 30, 45, 60];
 const RING = 280;
 const STROKE = 18;
 const RADIUS = (RING - STROKE) / 2;
 const CIRC = 2 * Math.PI * RADIUS;
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 function palette(dark: boolean) {
   return {
@@ -45,6 +47,20 @@ export default function TimerScreen() {
   const restingPhase = phase === "resting" || (phase === "paused" && t.state.phaseBeforePause === "resting");
   const ringColor = phase === "paused" ? c.paused : restingPhase ? c.resting : c.ready;
   const canConfirm = phase === "ready" || phase === "resting";
+
+  // Progress itself is still one wall-clock sample per tick; this only tweens
+  // how the ring is drawn between samples so the sweep reads as continuous
+  // instead of stepping every TICK_MS.
+  const ringProgress = useRef(new Animated.Value(progress)).current;
+  useEffect(() => {
+    Animated.timing(ringProgress, {
+      toValue: progress,
+      duration: TICK_MS,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start();
+  }, [progress, ringProgress]);
+  const dashOffset = ringProgress.interpolate({ inputRange: [0, 1], outputRange: [CIRC, 0] });
 
   if (phase === "idle") {
     return (
@@ -141,11 +157,11 @@ export default function TimerScreen() {
         <View style={{ width: RING, height: RING, alignItems: "center", justifyContent: "center" }}>
           <Svg width={RING} height={RING} style={StyleSheet.absoluteFill}>
             <Circle cx={RING / 2} cy={RING / 2} r={RADIUS} stroke={c.track} strokeWidth={STROKE} fill="none" />
-            <Circle
+            <AnimatedCircle
               cx={RING / 2} cy={RING / 2} r={RADIUS}
               stroke={ringColor} strokeWidth={STROKE} fill="none"
               strokeDasharray={CIRC}
-              strokeDashoffset={CIRC * (1 - progress)}
+              strokeDashoffset={dashOffset}
               strokeLinecap="round"
               transform={`rotate(-90 ${RING / 2} ${RING / 2})`}
             />
