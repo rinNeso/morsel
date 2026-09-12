@@ -293,9 +293,8 @@ struct TrendTilesPanel: View {
         let colour: Color = change == nil ? theme.dim : (losing ? .green : .red)
 
         return VStack(spacing: 4) {
-            Text(change.map { String(format: "%.1f", abs(settings.weightUnit.convert($0))) } ?? "—")
+            OdometerNumber(value: change.map { abs(settings.weightUnit.convert($0)) })
                 .font(.title3.weight(.semibold))
-                .monospacedDigit()
                 .foregroundStyle(.white)
             Text(change == nil ? "no data" : (losing ? "lost" : "gained"))
                 .font(.caption2.weight(.semibold))
@@ -343,4 +342,34 @@ struct RevealOnScroll: ViewModifier {
 
 extension View {
     func revealOnScroll() -> some View { modifier(RevealOnScroll()) }
+}
+
+/// Rolls its digits up from zero the first time the tile is seen.
+///
+/// `contentTransition(.numericText:)` is the system's own odometer: it knows
+/// which digits changed and in which direction, and rolls only those. Doing it
+/// by hand — cross-fading, or swapping the whole string — reads as a flicker
+/// rather than a mechanism.
+///
+/// Monospaced digits are not optional here. Proportional figures change width
+/// as they roll, so the tile would jitter horizontally the whole way up.
+private struct OdometerNumber: View {
+    let value: Double?
+
+    @State private var displayed: Double = 0
+
+    var body: some View {
+        Text(value == nil ? "—" : String(format: "%.1f", displayed))
+            .monospacedDigit()
+            .contentTransition(.numericText(value: displayed))
+            .onScrollVisibilityChange(threshold: 0.3) { visible in
+                guard visible, let value, displayed == 0 else { return }
+                withAnimation(.smooth(duration: 0.9)) { displayed = value }
+            }
+            .task {
+                try? await Task.sleep(for: .milliseconds(700))
+                guard let value, displayed == 0 else { return }
+                withAnimation(.smooth(duration: 0.9)) { displayed = value }
+            }
+    }
 }
