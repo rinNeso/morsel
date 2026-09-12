@@ -44,7 +44,14 @@ struct HistoryScreen: View {
                 }
             }
             .navigationTitle(editing ? "\(selection.count) selected" : "Meal history")
-            .navigationBarTitleDisplayMode(editing ? .inline : .large)
+            // Deliberately NOT toggling navigationBarTitleDisplayMode with
+            // `editing`. Doing so collapses and re-expands the bar, and the
+            // list's top content inset does not recompute cleanly on the way
+            // back — the first row settled at y=183, then 218, then 238 across
+            // edit cycles, gaining roughly 35-55pt each time and never
+            // returning. Measured, not guessed. The title text already carries
+            // the mode change.
+            .navigationBarTitleDisplayMode(.large)
             .background(theme.bg)
             .refreshable { await load() }
             .toolbar { selectionToolbar }
