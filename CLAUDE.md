@@ -161,6 +161,10 @@ SwiftUI/UIKit in Xcode 27.1, day one, with no third-party wrapper to wait for.
 - **XcodeGen needs each SwiftPM product named explicitly.** A bare `package:` entry
   links only the product sharing the package's name, so `MorselData` went missing
   until it was listed on its own.
+- **Run `xcodegen generate` after adding a source file.** XcodeGen enumerates `App/`
+  when it generates, so a new file is simply not in the target until it is rerun. The
+  failure looks like a type having "no member" somewhere else entirely, with no error
+  in the new file at all, because that file is not being compiled.
 - Watch out for `grep`'s exit code masking a command's own when verifying tool output.
 
 ## State

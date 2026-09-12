@@ -26,6 +26,7 @@ struct MorselApp: App {
                 // colour being threaded through by hand.
                 .tint(settings.accent)
                 .preferredColorScheme(settings.themeMode.colorScheme)
+                .devLogging()
                 .task { await settings.load() }
         }
     }

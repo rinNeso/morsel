@@ -57,6 +57,12 @@ struct HistoryScreen: View {
         .onChange(of: timer.state.phase) { _, phase in
             if phase == .idle { Task { await load() } }
         }
+        .onChange(of: editing) { _, isEditing in
+            DevLog.shared.state("history.editing", "\(isEditing)")
+        }
+        .onChange(of: selection.count) { _, count in
+            DevLog.shared.state("history.selected", "\(count)")
+        }
     }
 
     private var list: some View {
@@ -65,6 +71,7 @@ struct HistoryScreen: View {
         List(selection: $selection) {
             ForEach(meals) { meal in
                 MealRow(meal: meal)
+                    .devLogged("history-row")
             }
             .onDelete(perform: swipeDelete)
         }

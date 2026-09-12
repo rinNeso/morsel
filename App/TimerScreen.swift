@@ -247,6 +247,9 @@ struct TimerScreen: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Fullness \(value) out of 10")
+                    // Ten controls across a phone width: the most likely place
+                    // in the app to be under HIG's 44pt minimum.
+                    .devLogged("fullness-\(value)")
                 }
             }
 
