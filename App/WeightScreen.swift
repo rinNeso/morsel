@@ -17,6 +17,12 @@ struct WeightScreen: View {
     @State private var syncMessage: String?
     @State private var basis: ForecastBasis = .current
     @State private var editingGoal = false
+    /// How much history the chart shows. A month by default: enough for the
+    /// trend to have shape, short enough that a week's movement is legible.
+    @State private var visibleDays: Double = 30
+    /// Captured when a pinch begins, so the zoom scales from where it started
+    /// rather than compounding on every gesture update.
+    @State private var pinchBase: Double?
 
     var body: some View {
         NavigationStack {
@@ -129,36 +135,96 @@ struct WeightScreen: View {
     // MARK: Chart
 
     private var chart: some View {
-        Chart {
-            // Raw readings stay visible: the trend is the smoothing, not a
-            // replacement for what was actually measured.
-            ForEach(trend, id: \.date) { point in
-                if let date = Self.date(point.date) {
-                    PointMark(
-                        x: .value("Day", date),
-                        y: .value("Weight", settings.weightUnit.convert(point.kg))
-                    )
-                    .foregroundStyle(theme.dim.opacity(0.45))
-                    .symbolSize(24)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("TREND OVER TIME")
+                    .font(.caption.weight(.semibold))
+                    .kerning(1.2)
+                    .foregroundStyle(theme.dim)
+                Spacer()
+                // Live feedback while pinching: without it the gesture has no
+                // readout except the axis labels shifting.
+                Text(rangeLabel)
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(theme.dim)
+            }
+
+            Chart {
+                // Raw readings stay visible: the trend is the smoothing, not a
+                // replacement for what was actually measured.
+                ForEach(trend, id: \.date) { point in
+                    if let date = Self.date(point.date) {
+                        PointMark(
+                            x: .value("Day", date),
+                            y: .value("Weight", settings.weightUnit.convert(point.kg))
+                        )
+                        .foregroundStyle(theme.dim.opacity(0.45))
+                        .symbolSize(24)
+                    }
+                }
+                ForEach(trend, id: \.date) { point in
+                    if let date = Self.date(point.date) {
+                        LineMark(
+                            x: .value("Day", date),
+                            y: .value("Trend", settings.weightUnit.convert(point.trend)),
+                            series: .value("Series", "trend")
+                        )
+                        .foregroundStyle(theme.accent)
+                        .interpolationMethod(.monotone)
+                        .lineStyle(StrokeStyle(lineWidth: 2.5))
+                    }
                 }
             }
-            ForEach(trend, id: \.date) { point in
-                if let date = Self.date(point.date) {
-                    LineMark(
-                        x: .value("Day", date),
-                        y: .value("Trend", settings.weightUnit.convert(point.trend)),
-                        series: .value("Series", "trend")
-                    )
-                    .foregroundStyle(theme.accent)
-                    .interpolationMethod(.monotone)
-                    .lineStyle(StrokeStyle(lineWidth: 2.5))
-                }
-            }
+            .chartYScale(domain: .automatic(includesZero: false))
+            .chartXVisibleDomain(length: visibleDays * 86_400)
+            .chartScrollableAxes(.horizontal)
+            .chartScrollPosition(initialX: initialScrollDate)
+            .frame(height: 240)
+            .gesture(zoom)
+
+            Text("Pinch to zoom, drag to pan.")
+                .font(.caption2)
+                .foregroundStyle(theme.dim)
         }
-        .chartYScale(domain: .automatic(includesZero: false))
-        .frame(height: 240)
         .padding(16)
         .background(theme.card, in: .rect(cornerRadius: 16))
+    }
+
+    /// Pinching out shows *less* time, which is what zooming in means — so the
+    /// visible span divides by the magnification rather than multiplying.
+    private var zoom: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                let base = pinchBase ?? visibleDays
+                if pinchBase == nil { pinchBase = visibleDays }
+                visibleDays = min(max(base / value.magnification, 7), maxDays)
+            }
+            .onEnded { _ in pinchBase = nil }
+    }
+
+    /// Never zoom out past the data — empty space either side reads as missing
+    /// readings rather than as the end of the record.
+    private var maxDays: Double {
+        guard let first = points.first.flatMap({ dayNumber($0.date) }),
+              let last = points.last.flatMap({ dayNumber($0.date) }),
+              last > first
+        else { return 90 }
+        return Double(last - first) + 7
+    }
+
+    private var rangeLabel: String {
+        let days = Int(visibleDays.rounded())
+        if days >= 365 { return String(format: "%.1f years", Double(days) / 365) }
+        if days >= 60 { return "\(days / 30) months" }
+        return "\(days) days"
+    }
+
+    /// Anchored to the most recent readings rather than the oldest: the useful
+    /// view on opening is what happened lately.
+    private var initialScrollDate: Date {
+        guard let last = points.last.flatMap({ dayNumber($0.date) }) else { return Date() }
+        return Date(timeIntervalSince1970: Double(last) * 86_400 - visibleDays * 86_400)
     }
 
     private static func date(_ day: String) -> Date? {
