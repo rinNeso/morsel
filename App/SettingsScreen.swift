@@ -19,6 +19,7 @@ private struct ExportedData: Transferable {
 
 struct SettingsScreen: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(\.theme) private var theme
     @Environment(\.mealStore) private var store
 
     var body: some View {
@@ -104,6 +105,8 @@ struct SettingsScreen: View {
 /// Quick starting points. Both colour settings offer the same set — the picker
 /// above each one is what makes any colour reachable.
 private struct PresetSwatches: View {
+    @Environment(\.theme) private var theme
+
     let selected: Color
     /// Only used for the accessibility label, so "accent" and "resting" read
     /// distinctly to VoiceOver.
@@ -121,7 +124,7 @@ private struct PresetSwatches: View {
                         .frame(width: 34, height: 34)
                         .overlay(
                             Circle().strokeBorder(
-                                preset.hexString == selected.hexString ? Palette.text : .clear,
+                                preset.hexString == selected.hexString ? theme.text : .clear,
                                 lineWidth: 3
                             )
                         )

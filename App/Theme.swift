@@ -1,12 +1,52 @@
 import SwiftUI
 import UIKit
 
+/// Concrete colours for one appearance, rather than dynamic `UIColor`s that
+/// resolve from the trait environment.
+///
+/// That distinction is the whole point: a dynamic colour's *value* never
+/// changes when the appearance flips — only the way it resolves — so SwiftUI
+/// has nothing to interpolate and the switch can only ever snap or crossfade.
+/// Building the palette from an explicit `dark` flag means flipping that flag
+/// inside `withAnimation` gives a real interpolation, passing through the
+/// intermediate shades on the way.
+///
 /// Colour carries state: the accent means permission to eat, the resting colour
 /// means waiting, grey means paused. The app reports; it does not scold.
-///
-/// Both the accent and the resting colour are user-chosen (see `AppSettings`),
-/// and resting follows the accent unless it is set separately. Paused stays
-/// fixed grey — "nothing is happening" is not a matter of taste.
+struct Theme: Equatable {
+    let bg: Color
+    let card: Color
+    let text: Color
+    let dim: Color
+    let track: Color
+    /// Fixed grey regardless of accent — "nothing is happening" is not a
+    /// matter of taste.
+    let paused: Color
+    /// The user's chosen accent: permission to eat.
+    let accent: Color
+    /// Waiting between bites. Follows the accent unless set separately.
+    let resting: Color
+
+    init(dark: Bool, accent: Color, resting: Color) {
+        bg = dark ? Color(rgb: 0x12100E) : Color(rgb: 0xFBF8F4)
+        card = dark ? Color(rgb: 0x1E1B18) : Color(rgb: 0xFFFFFF)
+        text = dark ? Color(rgb: 0xF2EEE8) : Color(rgb: 0x22201D)
+        dim = dark ? Color(rgb: 0x9A9187) : Color(rgb: 0x7A736B)
+        track = dark ? Color(rgb: 0x2C2823) : Color(rgb: 0xEAE3D9)
+        paused = dark ? Color(rgb: 0x5A544C) : Color(rgb: 0xB5ADA2)
+        self.accent = accent
+        self.resting = resting
+    }
+}
+
+extension EnvironmentValues {
+    @Entry var theme = Theme(
+        dark: false,
+        accent: Palette.defaultAccent,
+        resting: Palette.defaultAccent
+    )
+}
+
 enum Palette {
     /// The original "ready" green — the intuitive default before any customising.
     static let defaultAccent = Color(rgb: 0x4C9A5E)
@@ -23,34 +63,15 @@ enum Palette {
         Color(rgb: 0xC4527A), // pink
         Color(rgb: 0xC0392B), // red
     ]
-
-    static let bg = dynamic(light: 0xFBF8F4, dark: 0x12100E)
-    static let card = dynamic(light: 0xFFFFFF, dark: 0x1E1B18)
-    static let text = dynamic(light: 0x22201D, dark: 0xF2EEE8)
-    static let dim = dynamic(light: 0x7A736B, dark: 0x9A9187)
-    static let track = dynamic(light: 0xEAE3D9, dark: 0x2C2823)
-    static let paused = dynamic(light: 0xB5ADA2, dark: 0x5A544C)
-
-    private static func dynamic(light: UInt32, dark: UInt32) -> Color {
-        Color(uiColor: UIColor { traits in
-            UIColor(rgb: traits.userInterfaceStyle == .dark ? dark : light)
-        })
-    }
 }
 
 extension Color {
     init(rgb: UInt32) {
-        self.init(uiColor: UIColor(rgb: rgb))
-    }
-}
-
-extension UIColor {
-    convenience init(rgb: UInt32) {
         self.init(
-            red: CGFloat((rgb >> 16) & 0xFF) / 255,
-            green: CGFloat((rgb >> 8) & 0xFF) / 255,
-            blue: CGFloat(rgb & 0xFF) / 255,
-            alpha: 1
+            .sRGB,
+            red: Double((rgb >> 16) & 0xFF) / 255,
+            green: Double((rgb >> 8) & 0xFF) / 255,
+            blue: Double(rgb & 0xFF) / 255
         )
     }
 }

@@ -4,6 +4,7 @@ import SwiftUI
 struct HistoryScreen: View {
     @Environment(\.mealStore) private var store
     @Environment(MealTimerModel.self) private var timer
+    @Environment(\.theme) private var theme
 
     @State private var meals: [MealHistoryEntry] = []
     @State private var loaded = false
@@ -44,7 +45,7 @@ struct HistoryScreen: View {
             }
             .navigationTitle(editing ? "\(selection.count) selected" : "Meal history")
             .navigationBarTitleDisplayMode(editing ? .inline : .large)
-            .background(Palette.bg)
+            .background(theme.bg)
             .refreshable { await load() }
             .toolbar { selectionToolbar }
             .overlay(alignment: .bottom) {
@@ -121,7 +122,7 @@ struct HistoryScreen: View {
         HStack {
             Text(pending?.entries.count == 1 ? "Meal deleted" : "\(pending?.entries.count ?? 0) meals deleted")
                 .font(.subheadline)
-                .foregroundStyle(Palette.text)
+                .foregroundStyle(theme.text)
             Spacer()
             Button("Undo") { undo() }
                 .font(.subheadline.weight(.semibold))
@@ -207,6 +208,8 @@ struct HistoryScreen: View {
 }
 
 private struct MealRow: View {
+    @Environment(\.theme) private var theme
+
     let meal: MealHistoryEntry
 
     var body: some View {
@@ -215,12 +218,12 @@ private struct MealRow: View {
                 Text(Date(timeIntervalSince1970: Double(meal.startedAt) / 1000)
                     .formatted(.dateTime.month(.abbreviated).day().hour().minute()))
                     .font(.headline)
-                    .foregroundStyle(Palette.text)
+                    .foregroundStyle(theme.text)
                 Spacer()
                 Text(mmss(meal.durationMs))
                     .font(.headline)
                     .monospacedDigit()
-                    .foregroundStyle(Palette.dim)
+                    .foregroundStyle(theme.dim)
             }
 
             HStack(spacing: 0) {
@@ -238,10 +241,10 @@ private struct MealRow: View {
             Text(value)
                 .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
-                .foregroundStyle(Palette.text)
+                .foregroundStyle(theme.text)
             Text(label)
                 .font(.caption2)
-                .foregroundStyle(Palette.dim)
+                .foregroundStyle(theme.dim)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

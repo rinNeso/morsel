@@ -3,13 +3,13 @@ import SwiftUI
 
 struct TimerScreen: View {
     @Environment(MealTimerModel.self) private var model
-    @Environment(AppSettings.self) private var settings
+    @Environment(\.theme) private var theme
     @Environment(\.scenePhase) private var scenePhase
 
-    /// Read from settings rather than `Color.accentColor`, which resolves the
-    /// environment's accent — not the value `.tint()` sets. Relying on it meant
-    /// the chosen colour could silently fail to reach these views.
-    private var accent: Color { settings.accent }
+    /// From the theme rather than `Color.accentColor`, which resolves the
+    /// environment's accent and not the value `.tint()` sets — relying on it
+    /// meant the chosen colour could silently fail to reach these views.
+    private var accent: Color { theme.accent }
 
     private let restPresets = [15, 20, 30, 45, 60]
 
@@ -22,7 +22,7 @@ struct TimerScreen: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.bg)
+        .background(theme.bg)
         .onChange(of: scenePhase) { _, phase in
             // An arbitrary amount of time may have passed with no timer
             // running; recompute from the wall clock.
@@ -36,15 +36,15 @@ struct TimerScreen: View {
         VStack(spacing: 16) {
             Text("Morsel")
                 .font(.largeTitle.bold())
-                .foregroundStyle(Palette.text)
+                .foregroundStyle(theme.text)
             Text("Put your food down after every bite, then tap.")
                 .font(.subheadline)
-                .foregroundStyle(Palette.dim)
+                .foregroundStyle(theme.dim)
 
             Text("REST BETWEEN BITES")
                 .font(.caption.weight(.semibold))
                 .kerning(1.2)
-                .foregroundStyle(Palette.dim)
+                .foregroundStyle(theme.dim)
                 .padding(.top, 24)
 
             HStack(spacing: 8) {
@@ -55,12 +55,12 @@ struct TimerScreen: View {
                     } label: {
                         Text("\(seconds)s")
                             .font(.callout.weight(.semibold))
-                            .foregroundStyle(selected ? .white : Palette.dim)
+                            .foregroundStyle(selected ? .white : theme.dim)
                             .padding(.horizontal, 18)
                             .padding(.vertical, 10)
                             .background(selected ? accent : .clear, in: .capsule)
                             .overlay(
-                                Capsule().strokeBorder(selected ? accent : Palette.track, lineWidth: 1.5)
+                                Capsule().strokeBorder(selected ? accent : theme.track, lineWidth: 1.5)
                             )
                     }
                     .buttonStyle(.plain)
@@ -98,7 +98,7 @@ struct TimerScreen: View {
                     }
                 }
                 .font(.subheadline)
-                .foregroundStyle(Palette.dim)
+                .foregroundStyle(theme.dim)
             }
             .padding(.horizontal, 28)
             .padding(.top, 8)
@@ -124,7 +124,7 @@ struct TimerScreen: View {
             .buttonStyle(.bordered)
             .buttonBorderShape(.capsule)
             .controlSize(.large)
-            .tint(Palette.dim)
+            .tint(theme.dim)
             .padding(24)
         }
     }
@@ -136,11 +136,11 @@ struct TimerScreen: View {
         let isResting = phase == .resting
             || (phase == .paused && model.state.phaseBeforePause == .resting)
         let color: Color = phase == .paused
-            ? Palette.paused
-            : (isResting ? settings.resolvedRestingColor : accent)
+            ? theme.paused
+            : (isResting ? theme.resting : accent)
 
         return ZStack {
-            Circle().stroke(Palette.track, lineWidth: 18)
+            Circle().stroke(theme.track, lineWidth: 18)
             Circle()
                 .trim(from: 0, to: model.state.restProgress(now: now))
                 .stroke(color, style: StrokeStyle(lineWidth: 18, lineCap: .round))
@@ -150,7 +150,7 @@ struct TimerScreen: View {
             case .paused:
                 Text("Paused")
                     .font(.title.bold())
-                    .foregroundStyle(Palette.paused)
+                    .foregroundStyle(theme.paused)
             case .ready:
                 VStack(spacing: 4) {
                     Text("Take a bite")
@@ -158,17 +158,17 @@ struct TimerScreen: View {
                         .foregroundStyle(accent)
                     Text("then tap when it's down")
                         .font(.subheadline)
-                        .foregroundStyle(Palette.dim)
+                        .foregroundStyle(theme.dim)
                 }
             default:
                 VStack(spacing: 4) {
                     Text("\(Int((Double(model.state.remainingRest(now: now)) / 1000).rounded(.up)))")
                         .font(.system(size: 76, weight: .medium))
                         .monospacedDigit()
-                        .foregroundStyle(Palette.text)
+                        .foregroundStyle(theme.text)
                     Text("food down")
                         .font(.subheadline)
-                        .foregroundStyle(Palette.dim)
+                        .foregroundStyle(theme.dim)
                 }
             }
         }
@@ -189,7 +189,7 @@ struct TimerScreen: View {
             VStack(spacing: 16) {
                 Text("Meal complete")
                     .font(.largeTitle.bold())
-                    .foregroundStyle(Palette.text)
+                    .foregroundStyle(theme.text)
 
                 VStack(spacing: 12) {
                     row("Bites", "\(summary.biteCount)")
@@ -208,7 +208,7 @@ struct TimerScreen: View {
                     }
                 }
                 .padding(20)
-                .background(Palette.card, in: .rect(cornerRadius: 16))
+                .background(theme.card, in: .rect(cornerRadius: 16))
 
                 fullnessRating
 
@@ -230,7 +230,7 @@ struct TimerScreen: View {
             Text("HOW FULL DO YOU FEEL?")
                 .font(.caption.weight(.semibold))
                 .kerning(1.2)
-                .foregroundStyle(Palette.dim)
+                .foregroundStyle(theme.dim)
 
             HStack(spacing: 6) {
                 ForEach(1...10, id: \.self) { value in
@@ -240,10 +240,10 @@ struct TimerScreen: View {
                     } label: {
                         Text("\(value)")
                             .font(.footnote.weight(chosen ? .bold : .regular))
-                            .foregroundStyle(chosen ? .white : Palette.text)
+                            .foregroundStyle(chosen ? .white : theme.text)
                             .frame(maxWidth: .infinity)
                             .frame(height: 36)
-                            .background(chosen ? accent : Palette.card, in: .capsule)
+                            .background(chosen ? accent : theme.card, in: .capsule)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Fullness \(value) out of 10")
@@ -259,15 +259,15 @@ struct TimerScreen: View {
                 Text("Uncomfortably full")
             }
             .font(.caption2)
-            .foregroundStyle(Palette.dim)
+            .foregroundStyle(theme.dim)
         }
     }
 
     private func row(_ key: String, _ value: String) -> some View {
         HStack {
-            Text(key).foregroundStyle(Palette.dim)
+            Text(key).foregroundStyle(theme.dim)
             Spacer()
-            Text(value).fontWeight(.semibold).monospacedDigit().foregroundStyle(Palette.text)
+            Text(value).fontWeight(.semibold).monospacedDigit().foregroundStyle(theme.text)
         }
         .font(.subheadline)
     }

@@ -33,6 +33,20 @@ struct MorselApp: App {
 }
 
 struct RootView: View {
+    @Environment(AppSettings.self) private var settings
+    @Environment(\.colorScheme) private var systemScheme
+
+    /// Derived from our own state where the user has chosen, so flipping it
+    /// inside `withAnimation` interpolates the palette. Only the `.system` case
+    /// defers to the environment, and that change comes from the OS anyway.
+    private var isDark: Bool {
+        switch settings.themeMode {
+        case .dark: true
+        case .light: false
+        case .system: systemScheme == .dark
+        }
+    }
+
     var body: some View {
         // Liquid Glass, the floating capsule shape, and minimize-on-scroll all
         // come from the system here — no reimplementation.
@@ -48,6 +62,11 @@ struct RootView: View {
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
+        .environment(\.theme, Theme(
+            dark: isDark,
+            accent: settings.accent,
+            resting: settings.resolvedRestingColor
+        ))
     }
 }
 
