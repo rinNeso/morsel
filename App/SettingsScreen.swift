@@ -19,29 +19,9 @@ struct SettingsScreen: View {
                     // SwiftUI's own picker — the whole hand-rolled colour wheel
                     // the React Native build needed reduces to this line.
                     ColorPicker("Accent colour", selection: accentBinding, supportsOpacity: false)
-
-                    HStack(spacing: 12) {
-                        ForEach(Palette.accentPresets, id: \.hexString) { preset in
-                            Button {
-                                settings.setAccent(preset)
-                            } label: {
-                                Circle()
-                                    .fill(preset)
-                                    .frame(width: 34, height: 34)
-                                    .overlay(
-                                        Circle().strokeBorder(
-                                            preset.hexString == settings.accent.hexString
-                                                ? Palette.text : .clear,
-                                            lineWidth: 3
-                                        )
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Use \(preset.hexString) as accent colour")
-                        }
+                    PresetSwatches(selected: settings.accent, role: "accent") {
+                        settings.setAccent($0)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 4)
                 } header: {
                     Text("Accent colour")
                 } footer: {
@@ -50,8 +30,11 @@ struct SettingsScreen: View {
 
                 Section {
                     Toggle("Match accent colour", isOn: matchAccentBinding)
-                    if settings.restingColor != nil {
+                    if let resting = settings.restingColor {
                         ColorPicker("Resting colour", selection: restingBinding, supportsOpacity: false)
+                        PresetSwatches(selected: resting, role: "resting") {
+                            settings.setRestingColor($0)
+                        }
                     }
                 } header: {
                     Text("Resting colour")
@@ -82,5 +65,39 @@ struct SettingsScreen: View {
 
     private var restingBinding: Binding<Color> {
         Binding(get: { settings.resolvedRestingColor }, set: { settings.setRestingColor($0) })
+    }
+}
+
+/// Quick starting points. Both colour settings offer the same set — the picker
+/// above each one is what makes any colour reachable.
+private struct PresetSwatches: View {
+    let selected: Color
+    /// Only used for the accessibility label, so "accent" and "resting" read
+    /// distinctly to VoiceOver.
+    let role: String
+    let onSelect: (Color) -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ForEach(Palette.accentPresets, id: \.hexString) { preset in
+                Button {
+                    onSelect(preset)
+                } label: {
+                    Circle()
+                        .fill(preset)
+                        .frame(width: 34, height: 34)
+                        .overlay(
+                            Circle().strokeBorder(
+                                preset.hexString == selected.hexString ? Palette.text : .clear,
+                                lineWidth: 3
+                            )
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Use \(preset.hexString) as \(role) colour")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
     }
 }
