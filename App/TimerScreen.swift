@@ -163,7 +163,7 @@ struct TimerScreen: View {
             default:
                 VStack(spacing: 4) {
                     Text("\(Int((Double(model.state.remainingRest(now: now)) / 1000).rounded(.up)))")
-                        .font(.system(size: 76, weight: .ultraLight))
+                        .font(.system(size: 76, weight: .bold))
                         .monospacedDigit()
                         .foregroundStyle(Palette.text)
                     Text("food down")
