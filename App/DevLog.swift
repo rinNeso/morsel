@@ -166,8 +166,14 @@ private struct TouchWatcher: UIViewRepresentable {
 }
 
 /// Becomes first responder so shakes reach `motionEnded`.
+///
+/// Motion events are delivered through the responder chain, not by hit
+/// testing, so this must refuse every touch — without the override below it
+/// returns itself for any point inside its bounds and swallows the entire UI.
 private final class ShakeWatchingView: UIView {
     override var canBecomeFirstResponder: Bool { true }
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? { nil }
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
