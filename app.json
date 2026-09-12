@@ -45,6 +45,7 @@
           "cameraPermission": "Morsel uses the camera to scan barcodes on food packaging."
         }
       ],
+      "./plugins/withoutPushEntitlement.js",
       [
         "expo-notifications",
         {

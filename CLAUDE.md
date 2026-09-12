@@ -14,9 +14,12 @@ considered and rejected there for stated reasons.
 
 ## Two machines — work out which one you are on first
 
+Both machines now do day-to-day development. The MacBook Pro is additionally the
+only one that can sign and install to the phone.
+
 | | Linux desktop (`/home/nate/Projects/morsel`) | MacBook Pro |
 |---|---|---|
-| Role | all day-to-day development | signing and device installs only |
+| Role | day-to-day development | day-to-day development, plus signing and device installs |
 | Can do | edit, typecheck, run tests, `expo export`, `expo start` | everything, plus Xcode |
 | Cannot do | compile iOS, run a simulator, verify haptics | — |
 
