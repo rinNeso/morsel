@@ -77,7 +77,17 @@ final class AppSettings {
     }
 
     func setThemeMode(_ mode: ThemeMode) {
-        themeMode = mode
+        // 0.3s to sit with the system's own trait-change fade rather than
+        // alongside it — the status bar clock crossfading is the visible
+        // reference. Apple does not publish that duration as a constant, so
+        // this is matched by eye against the convention.
+        //
+        // Only carries views whose colours SwiftUI resolves and interpolates;
+        // the window-level change `.preferredColorScheme` drives belongs to the
+        // system, so some chrome switches on its own schedule regardless.
+        withAnimation(.easeInOut(duration: 0.3)) {
+            themeMode = mode
+        }
         Task { try? await store?.setSetting(Self.themeKey, to: mode.rawValue) }
     }
 
