@@ -118,13 +118,15 @@ any nutrition features: no streak shaming, no "you exceeded your goal".
 
 Done: spec, schema, EWMA/OLS weight math (17 assertions), meal timer state machine
 (43 assertions), timer UI, Expo SDK 57 scaffold. Everything typechecks and bundles.
+First dev client built and installed on device from the MacBook — signing works
+end to end, timer UI confirmed running on a real phone.
 
-Never verified on a device: haptics, keep-awake, and whether the 30s default feels
-right in a real meal. Only the owner eating a meal can settle that.
+Never verified: haptics, keep-awake, and whether the 30s default feels right in a
+real meal. Only the owner eating a meal can settle that.
 
-Next: SQLite persistence and the end-of-meal fullness rating — currently a meal
-evaporates when the app closes. Then weight tracking (v2), nutrition (v3), and the
-pace-vs-fullness-vs-calories correlation (v4) that is the point of the whole thing.
+Roadmap and open work are tracked as GitHub Issues (labels `v1-timer` through
+`v4-correlation`), not here — check the issue tracker rather than this file for
+what's next. This section stays for state that isn't a discrete ticket.
 
 ## Conventions
 
