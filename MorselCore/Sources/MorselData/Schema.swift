@@ -65,6 +65,24 @@ enum Schema {
             }
         }
 
+        migrator.registerMigration("v3-weight") { db in
+            // Stored in kg; display units are a presentation setting.
+            //
+            // One weigh-in per local day, enforced. The EWMA trend assumes a
+            // daily series, and several readings on the same morning are the
+            // water-weight noise the trend exists to discard — so a second
+            // reading replaces the first rather than adding a point.
+            try db.create(table: "weight") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("measured_on", .text).notNull().unique() // local YYYY-MM-DD
+                t.column("kg", .double).notNull()
+                t.column("source", .text).notNull().defaults(to: "manual") // manual | healthkit | import
+                t.column("hk_uuid", .text) // HealthKit sample id, for dedupe on re-sync
+                t.column("noted_at", .text).notNull()
+            }
+            try db.create(index: "weight_date_idx", on: "weight", columns: ["measured_on"])
+        }
+
         return migrator
     }
 }

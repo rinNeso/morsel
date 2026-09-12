@@ -35,6 +35,12 @@ struct SettingsScreen: View {
                         }
                     }
                     .pickerStyle(.segmented)
+
+                    Picker("Weight in", selection: weightUnitBinding) {
+                        ForEach(WeightUnit.allCases) { unit in
+                            Text(unit.label).tag(unit)
+                        }
+                    }
                 }
 
                 Section {
@@ -136,6 +142,10 @@ struct SettingsScreen: View {
 
     private var accentBinding: Binding<Color> {
         Binding(get: { settings.accent }, set: { settings.setAccent($0) })
+    }
+
+    private var weightUnitBinding: Binding<WeightUnit> {
+        Binding(get: { settings.weightUnit }, set: { settings.setWeightUnit($0) })
     }
 
     private var themeBinding: Binding<ThemeMode> {

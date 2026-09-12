@@ -45,7 +45,7 @@ public struct TrendPoint: Sendable, Equatable {
 /// arithmetic (Howard Hinnant's civil-date algorithm). Deliberately avoids
 /// `DateFormatter`: no locale, no time zone, no DST can shift a day count,
 /// and it stays identical on Linux.
-func dayNumber(_ date: String) -> Int? {
+public func dayNumber(_ date: String) -> Int? {
     let parts = date.split(separator: "-")
     guard parts.count == 3,
           let y = Int(parts[0]), let m = Int(parts[1]), let d = Int(parts[2]),
@@ -61,7 +61,7 @@ func dayNumber(_ date: String) -> Int? {
 }
 
 /// Inverse of `dayNumber`.
-func dayString(_ n: Int) -> String {
+public func dayString(_ n: Int) -> String {
     let z = n + 719_468
     let era = (z >= 0 ? z : z - 146_096) / 146_097
     let doe = z - era * 146_097

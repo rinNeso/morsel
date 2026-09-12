@@ -2,6 +2,29 @@ import MorselData
 import Observation
 import SwiftUI
 
+/// Kilograms are what get stored; this is purely how they are shown.
+enum WeightUnit: String, CaseIterable, Identifiable {
+    case kg, lb
+
+    var id: String { rawValue }
+    var label: String { self == .kg ? "Kilograms" : "Pounds" }
+    var suffix: String { rawValue }
+
+    private static let poundsPerKilogram = 2.20462262
+
+    func convert(_ kilograms: Double) -> Double {
+        self == .kg ? kilograms : kilograms * Self.poundsPerKilogram
+    }
+
+    func toKilograms(_ value: Double) -> Double {
+        self == .kg ? value : value / Self.poundsPerKilogram
+    }
+
+    func format(_ kilograms: Double) -> String {
+        String(format: "%.1f %@", convert(kilograms), suffix)
+    }
+}
+
 enum ThemeMode: String, CaseIterable, Identifiable {
     case system, light, dark
 
@@ -41,6 +64,8 @@ final class AppSettings {
     /// resting ring out into its own colour.
     private(set) var restingColor: Color?
 
+    private(set) var weightUnit: WeightUnit = .lb
+
     /// What the resting ring actually draws with.
     var resolvedRestingColor: Color { restingColor ?? accent }
 
@@ -49,6 +74,7 @@ final class AppSettings {
     private static let accentKey = "accent_color"
     private static let themeKey = "theme_mode"
     private static let restingKey = "resting_color"
+    private static let weightUnitKey = "weight_unit"
     /// Sentinel for "follow the accent", so the stored value distinguishes
     /// "deliberately following" from "never set".
     private static let matchAccent = "match"
@@ -67,6 +93,9 @@ final class AppSettings {
         }
         if let raw = try? await store.setting(Self.restingKey), raw != Self.matchAccent {
             restingColor = Color(hexString: raw)
+        }
+        if let raw = try? await store.setting(Self.weightUnitKey), let unit = WeightUnit(rawValue: raw) {
+            weightUnit = unit
         }
     }
 
@@ -89,6 +118,11 @@ final class AppSettings {
             themeMode = mode
         }
         Task { try? await store?.setSetting(Self.themeKey, to: mode.rawValue) }
+    }
+
+    func setWeightUnit(_ unit: WeightUnit) {
+        weightUnit = unit
+        Task { try? await store?.setSetting(Self.weightUnitKey, to: unit.rawValue) }
     }
 
     /// Pass nil to go back to following the accent.
