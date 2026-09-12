@@ -8,6 +8,7 @@ import {
   DEFAULT_REST_MS,
 } from "../lib/mealTimer.ts";
 import type { Event, MealState, Phase } from "../lib/mealTimer.ts";
+import { createMeal, insertBite, endMeal } from "../lib/db.ts";
 
 const KEEP_AWAKE_TAG = "morsel-meal";
 /** UI refresh rate. Smooth enough for the ring; nowhere near the timing source. */
@@ -66,6 +67,39 @@ export function useMealTimer(restMs: number = DEFAULT_REST_MS) {
     }
     prevPhase.current = state.phase;
   }, [state.phase]);
+
+  // Mirror each transition to SQLite so a meal survives the app closing.
+  // idle -> ready only ever happens via START, which is what makes it a safe
+  // signal to create the row; every other transition into "ready" is a normal
+  // resting -> ready cue. See src/lib/db.ts for what this does and does not
+  // cover (no resume-in-progress on relaunch yet).
+  const dbMealId = useRef<number | null>(null);
+  const persistedBites = useRef(0);
+  const prevPersistPhase = useRef<Phase>(state.phase);
+  useEffect(() => {
+    const prev = prevPersistPhase.current;
+    prevPersistPhase.current = state.phase;
+
+    if (prev === "idle" && state.phase === "ready" && state.startedAt !== null) {
+      persistedBites.current = 0;
+      createMeal(state.startedAt, state.restMs)
+        .then((id) => { dbMealId.current = id; })
+        .catch(() => {});
+      return;
+    }
+
+    if (dbMealId.current === null) return;
+
+    if (state.bites.length > persistedBites.current) {
+      const bite = state.bites[state.bites.length - 1];
+      persistedBites.current = state.bites.length;
+      insertBite(dbMealId.current, bite).catch(() => {});
+    }
+
+    if (prev !== "ended" && state.phase === "ended" && state.endedAt !== null) {
+      endMeal(dbMealId.current, state.endedAt, state.pausedTotalMs).catch(() => {});
+    }
+  }, [state.phase, state.bites.length, state.startedAt, state.restMs, state.endedAt, state.pausedTotalMs]);
 
   const now = Date.now();
   return {
