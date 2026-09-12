@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "Morsel",
+    "slug": "morsel",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "morsel",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.rinneso.morsel",
+      "supportsTablet": false,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "audio"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.rinneso.morsel",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Morsel reads your weight history so it can chart your trend.",
+          "NSHealthUpdateUsageDescription": "Morsel saves weigh-ins you enter back to Health.",
+          "background": false
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Morsel uses the camera to scan barcodes on food packaging."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png"
+        }
+      ]
+    ]
+  }
+}
