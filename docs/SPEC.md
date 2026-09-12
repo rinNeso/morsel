@@ -25,10 +25,17 @@ The premise is that eating fast defeats satiety signalling — fullness takes ro
 the intervention. Everything else is instrumentation that tells you whether the
 intervention is working.
 
+That "20 minutes" is a folk number doing real work, so it is worth being precise:
+mechanical stretch signals from the stomach reach the brain almost immediately; it is
+the *hormonal* nutrient signalling that lags. GLP-1 peaks 30–60 min after a meal and
+CCK around 45 min, both staying elevated for roughly 180 min. The lag is real; the
+specific figure is approximate.
+
 That framing sets the priority order:
 
 1. **Bite timer** — the actual behaviour change. Must be good, not just present.
-2. **Fullness rating** — the feedback signal. One tap at end of meal.
+2. **Fullness rating** — a cheap outcome signal. One tap at end of meal. See the
+   evidence note below before treating it as proof of anything.
 3. **Weight trend** — the slow outcome measure. Happy Scale's job.
 4. **Calorie/nutrition log** — the explanatory variable. Lowest priority, highest effort.
 
@@ -37,6 +44,29 @@ given calorie load**. If a 700 kcal dinner eaten at 30s/bite lands at fullness 7
 same meal at 10s/bite lands at fullness 4, that is the whole thesis demonstrated on
 personal data. Designing for that correlation from day one is why `fullness` and
 `bite` timings are first-class columns rather than afterthoughts.
+
+### What the evidence actually supports
+
+Checked 2026-09-12, because the distinction changes which number matters.
+
+- **Slower eating lowers energy intake.** Robinson et al. 2014, a meta-analysis of 22
+  studies: SMD 0.45 (95% CI 0.25–0.65, p<0.0001), consistent across different ways of
+  slowing people down. The timer itself rests on solid ground.
+  <https://www.sciencedirect.com/science/article/pii/S0002916523046816>
+- **Slower eating has not been shown to change felt fullness.** That same meta-analysis
+  found *no* significant relation between eating rate and hunger at end of meal or up to
+  3.5 h later.
+- **Fullness ratings are a validated instrument, but a noisy one.** Flint et al. 2000
+  validated visual-analogue appetite scales; coefficients of repeatability ran 20–61 mm
+  on a 100 mm scale, and standardising diet beforehand did not improve them.
+  <https://www.nature.com/articles/0801083>
+
+So the honest framing: **energy intake is the outcome the evidence backs**, which makes
+the v3 nutrition log — not fullness — the measure that could actually demonstrate the
+intervention working. Fullness stays because it costs one tap and a null result at
+group level does not rule out an n-of-1 effect you cannot find without collecting it.
+It is a cheap covariate, not proof. Expect pace-vs-fullness to come back flat, and
+treat it as interesting if it does not.
 
 The second signal, cheaper still: **pace drift** — mean time-to-confirm across
 the first third of a meal versus the last third. The rest interval is enforced
@@ -110,6 +140,11 @@ Design decisions worth stating:
 
 Prompt for fullness 1-10. Optionally hunger 1-10 at the start. These two numbers are
 the highest-value data in the app relative to the effort of collecting them.
+
+Label the endpoints — "still hungry" to "uncomfortably full". A bare 1-10 drifts over
+months as the rater silently rescales, and the whole point is that a 7 today is
+comparable to a 7 in March. Rating is skippable: an unrated meal is honest, a guessed
+rating is noise in the one column that is supposed to mean something.
 
 ## Weight trends (the Happy Scale part)
 

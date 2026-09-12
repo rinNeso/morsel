@@ -210,9 +210,7 @@ struct TimerScreen: View {
                 .padding(20)
                 .background(Palette.card, in: .rect(cornerRadius: 16))
 
-                Text("Fullness rating and saving come next.")
-                    .font(.subheadline)
-                    .foregroundStyle(Palette.dim)
+                fullnessRating
 
                 Button("Done") { model.send(.reset) }
                     .buttonStyle(.borderedProminent)
@@ -220,6 +218,45 @@ struct TimerScreen: View {
                     .controlSize(.large)
             }
             .padding(24)
+        }
+    }
+
+    /// The meal's outcome measure. The endpoints are labelled deliberately: a
+    /// bare 1-10 drifts over months, so anchoring them is what makes a 7 today
+    /// comparable to a 7 in March. Skippable — an unrated meal is honest,
+    /// a guessed rating is noise.
+    private var fullnessRating: some View {
+        VStack(spacing: 10) {
+            Text("HOW FULL DO YOU FEEL?")
+                .font(.caption.weight(.semibold))
+                .kerning(1.2)
+                .foregroundStyle(Palette.dim)
+
+            HStack(spacing: 6) {
+                ForEach(1...10, id: \.self) { value in
+                    let chosen = model.fullness == value
+                    Button {
+                        model.setFullness(value)
+                    } label: {
+                        Text("\(value)")
+                            .font(.footnote.weight(chosen ? .bold : .regular))
+                            .foregroundStyle(chosen ? .white : Palette.text)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 36)
+                            .background(chosen ? accent : Palette.card, in: .capsule)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Fullness \(value) out of 10")
+                }
+            }
+
+            HStack {
+                Text("Still hungry")
+                Spacer()
+                Text("Uncomfortably full")
+            }
+            .font(.caption2)
+            .foregroundStyle(Palette.dim)
         }
     }
 

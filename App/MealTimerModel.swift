@@ -15,6 +15,9 @@ final class MealTimerModel {
     /// The rest interval chosen on the idle screen, remembered across meals.
     var restSeconds: Int = 30
 
+    /// Fullness given on the end-of-meal screen, cleared with the meal.
+    private(set) var fullness: Int?
+
     @ObservationIgnored private let store: MealStore?
     @ObservationIgnored private var mealID: Int64?
     /// Persistence runs off the main thread, but the writes are order-
@@ -54,6 +57,19 @@ final class MealTimerModel {
     func confirmBite() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         send(.confirmBite)
+    }
+
+    /// Rated on the end-of-meal screen, and re-rateable until the meal is
+    /// dismissed — a second thought a minute later is a better reading than
+    /// the first tap, not worse.
+    func setFullness(_ rating: Int) {
+        fullness = rating
+        UISelectionFeedbackGenerator().selectionChanged()
+        guard let store else { return }
+        enqueueWrite { [weak self] in
+            guard let id = self?.mealID else { return }
+            try? await store.setFullness(rating, mealID: id)
+        }
     }
 
     private func handle(transitionFrom before: Phase) {
@@ -103,6 +119,7 @@ final class MealTimerModel {
 
         if state.phase == .idle {
             mealID = nil
+            fullness = nil
         }
     }
 
