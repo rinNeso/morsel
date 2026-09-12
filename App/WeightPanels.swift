@@ -344,32 +344,58 @@ extension View {
     func revealOnScroll() -> some View { modifier(RevealOnScroll()) }
 }
 
-/// Rolls its digits up from zero the first time the tile is seen.
+/// Counts up from zero the first time the tile is seen.
 ///
-/// `contentTransition(.numericText:)` is the system's own odometer: it knows
-/// which digits changed and in which direction, and rolls only those. Doing it
-/// by hand — cross-fading, or swapping the whole string — reads as a flicker
-/// rather than a mechanism.
+/// `contentTransition(.numericText:)` was the obvious tool and the wrong one:
+/// it animates the transition *between two strings*, so 0.0 to 5.6 is a single
+/// roll lasting a frame or two and reads as a cross-fade. The mechanical part
+/// of an odometer is passing through everything in between.
 ///
-/// Monospaced digits are not optional here. Proportional figures change width
-/// as they roll, so the tile would jitter horizontally the whole way up.
+/// `Animatable` gets that: SwiftUI interpolates `animatableData` once per
+/// frame, so the text is re-rendered the whole way up and the tenths digit
+/// visibly spins while the units climb.
+///
+/// Eased out rather than linear, so it decelerates into its final value the way
+/// a real dial settles instead of stopping dead. Monospaced digits are not
+/// optional — proportional figures change width as they count, and the tile
+/// would jitter sideways the entire time.
+private struct CountingNumber: View, Animatable {
+    var value: Double
+
+    // nonisolated because SwiftUI drives this from its animation machinery
+    // rather than the main actor, and it touches nothing isolated.
+    nonisolated var animatableData: Double {
+        get { value }
+        set { value = newValue }
+    }
+
+    var body: some View {
+        Text(String(format: "%.1f", value))
+            .monospacedDigit()
+    }
+}
+
 private struct OdometerNumber: View {
     let value: Double?
 
     @State private var displayed: Double = 0
 
     var body: some View {
-        Text(value == nil ? "—" : String(format: "%.1f", displayed))
-            .monospacedDigit()
-            .contentTransition(.numericText(value: displayed))
-            .onScrollVisibilityChange(threshold: 0.3) { visible in
-                guard visible, let value, displayed == 0 else { return }
-                withAnimation(.smooth(duration: 0.9)) { displayed = value }
+        Group {
+            if value == nil {
+                Text("—").monospacedDigit()
+            } else {
+                CountingNumber(value: displayed)
             }
-            .task {
-                try? await Task.sleep(for: .milliseconds(700))
-                guard let value, displayed == 0 else { return }
-                withAnimation(.smooth(duration: 0.9)) { displayed = value }
-            }
+        }
+        .onScrollVisibilityChange(threshold: 0.3) { visible in
+            guard visible, let value, displayed == 0 else { return }
+            withAnimation(.easeOut(duration: 1.2)) { displayed = value }
+        }
+        .task {
+            try? await Task.sleep(for: .milliseconds(700))
+            guard let value, displayed == 0 else { return }
+            withAnimation(.easeOut(duration: 1.2)) { displayed = value }
+        }
     }
 }
