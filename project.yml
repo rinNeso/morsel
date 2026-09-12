@@ -38,7 +38,7 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: Morsel Next
+        CFBundleDisplayName: Morsel
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -54,10 +54,7 @@ targets:
         # that cost is gone, so there's no reason to request what we don't use.
     settings:
       base:
-        # Separate bundle ID from the RN build (com.rinneso.morsel) so both can
-        # sit on the phone at once. The RN app stays usable for real meals
-        # until this reaches parity, then this takes over the real identifier.
-        PRODUCT_BUNDLE_IDENTIFIER: com.rinneso.morsel.next
+        PRODUCT_BUNDLE_IDENTIFIER: com.rinneso.morsel
         PRODUCT_NAME: Morsel
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
