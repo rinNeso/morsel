@@ -9,6 +9,24 @@ public struct ImportResult: Sendable, Equatable {
     public let skipped: Int
     /// Settings taken from the file because nothing local held that key.
     public let settingsApplied: Int
+    /// Weigh-ins written.
+    public let weighInsImported: Int
+    /// Days already recorded here, left as they were.
+    public let weighInsSkipped: Int
+
+    public init(
+        imported: Int,
+        skipped: Int,
+        settingsApplied: Int,
+        weighInsImported: Int = 0,
+        weighInsSkipped: Int = 0
+    ) {
+        self.imported = imported
+        self.skipped = skipped
+        self.settingsApplied = settingsApplied
+        self.weighInsImported = weighInsImported
+        self.weighInsSkipped = weighInsSkipped
+    }
 }
 
 public enum ImportError: Error, LocalizedError, Equatable {
@@ -88,6 +106,25 @@ extension MealStore {
                 imported += 1
             }
 
+            // Same merge rule as meals, keyed on the day: a day already weighed
+            // in is not overwritten by a backup.
+            let existingDays = Set(try String.fetchAll(db, sql: "SELECT measured_on FROM weight"))
+            var weighInsImported = 0
+            var weighInsSkipped = 0
+            let notedAt = iso(from: Millis(Date().timeIntervalSince1970 * 1000))
+
+            for weighIn in snapshot.weighIns {
+                guard !existingDays.contains(weighIn.measuredOn) else {
+                    weighInsSkipped += 1
+                    continue
+                }
+                try db.execute(
+                    sql: "INSERT INTO weight (measured_on, kg, source, noted_at) VALUES (?, ?, ?, ?)",
+                    arguments: [weighIn.measuredOn, weighIn.kg, weighIn.source, notedAt]
+                )
+                weighInsImported += 1
+            }
+
             var settingsApplied = 0
             for (key, value) in snapshot.settings {
                 let present = try Bool.fetchOne(
@@ -101,7 +138,13 @@ extension MealStore {
                 settingsApplied += 1
             }
 
-            return ImportResult(imported: imported, skipped: skipped, settingsApplied: settingsApplied)
+            return ImportResult(
+                imported: imported,
+                skipped: skipped,
+                settingsApplied: settingsApplied,
+                weighInsImported: weighInsImported,
+                weighInsSkipped: weighInsSkipped
+            )
         }
     }
 

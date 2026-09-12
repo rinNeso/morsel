@@ -20,9 +20,43 @@ public struct MorselExport: Codable, Sendable, Equatable {
     public let formatVersion: Int
     public let exportedAt: String
     public let meals: [ExportedMeal]
+    public let weighIns: [ExportedWeighIn]
     public let settings: [String: String]
 
-    public static let currentFormatVersion = 1
+    /// Version 2 added weigh-ins. Version 1 files still restore — they simply
+    /// carry no weight history — which is why the decoder defaults the field
+    /// rather than requiring it.
+    public static let currentFormatVersion = 2
+
+    public init(
+        formatVersion: Int,
+        exportedAt: String,
+        meals: [ExportedMeal],
+        weighIns: [ExportedWeighIn] = [],
+        settings: [String: String]
+    ) {
+        self.formatVersion = formatVersion
+        self.exportedAt = exportedAt
+        self.meals = meals
+        self.weighIns = weighIns
+        self.settings = settings
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        formatVersion = try container.decode(Int.self, forKey: .formatVersion)
+        exportedAt = try container.decode(String.self, forKey: .exportedAt)
+        meals = try container.decode([ExportedMeal].self, forKey: .meals)
+        weighIns = try container.decodeIfPresent([ExportedWeighIn].self, forKey: .weighIns) ?? []
+        settings = try container.decode([String: String].self, forKey: .settings)
+    }
+}
+
+public struct ExportedWeighIn: Codable, Sendable, Equatable {
+    /// Local day, `YYYY-MM-DD`.
+    public let measuredOn: String
+    public let kg: Double
+    public let source: String
 }
 
 public struct ExportedMeal: Codable, Sendable, Equatable {
@@ -96,6 +130,16 @@ extension MealStore {
                 )
             }
 
+            let weighIns = try Row
+                .fetchAll(db, sql: "SELECT measured_on, kg, source FROM weight ORDER BY measured_on ASC")
+                .map { row in
+                    ExportedWeighIn(
+                        measuredOn: row["measured_on"],
+                        kg: row["kg"],
+                        source: row["source"] ?? "manual"
+                    )
+                }
+
             var settings: [String: String] = [:]
             for row in try Row.fetchAll(db, sql: "SELECT key, value FROM setting") {
                 settings[row["key"]] = row["value"]
@@ -105,6 +149,7 @@ extension MealStore {
                 formatVersion: MorselExport.currentFormatVersion,
                 exportedAt: iso(from: Millis(Date().timeIntervalSince1970 * 1000)),
                 meals: meals,
+                weighIns: weighIns,
                 settings: settings
             )
         }

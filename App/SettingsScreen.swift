@@ -134,6 +134,9 @@ struct SettingsScreen: View {
         if result.skipped > 0 {
             parts.append("\(result.skipped) already here, left alone.")
         }
+        if result.weighInsImported > 0 {
+            parts.append("\(result.weighInsImported) weigh-in\(result.weighInsImported == 1 ? "" : "s") restored.")
+        }
         if result.settingsApplied > 0 {
             parts.append("Appearance settings restored.")
         }

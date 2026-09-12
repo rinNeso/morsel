@@ -145,3 +145,75 @@ struct RefusingBadInput {
         #expect(try await store.listMeals().count == 1, "nothing added, nothing lost")
     }
 }
+
+@Suite("Weigh-ins survive a backup")
+struct WeighInsInBackups {
+    /// The bug this suite exists for: the weight table was added after export
+    /// and import were written, and neither was updated. A whole Apple Health
+    /// history was silently absent from every backup taken.
+    @Test("weigh-ins are exported and restore intact")
+    func weighInsRoundTrip() async throws {
+        let source = try MealStore(path: nil)
+        try await source.recordWeight(WeighIn(measuredOn: "2026-03-01", kg: 90.0))
+        try await source.recordWeight(WeighIn(measuredOn: "2026-03-02", kg: 89.7, source: "healthkit"))
+
+        let snapshot = try await source.exportSnapshot()
+        #expect(snapshot.weighIns.count == 2, "a backup without weigh-ins is not a backup")
+
+        let destination = try MealStore(path: nil)
+        let result = try await destination.importSnapshot(snapshot)
+        #expect(result.weighInsImported == 2)
+
+        let restored = try await destination.weighIns()
+        #expect(restored.map(\.measuredOn) == ["2026-03-01", "2026-03-02"])
+        #expect(restored[1].kg == 89.7)
+        #expect(restored[1].source == "healthkit", "where a reading came from survives too")
+    }
+
+    @Test("a day already weighed in is not overwritten by a backup")
+    func localWeighInsWin() async throws {
+        let source = try MealStore(path: nil)
+        try await source.recordWeight(WeighIn(measuredOn: "2026-03-01", kg: 90.0))
+
+        let destination = try MealStore(path: nil)
+        try await destination.recordWeight(WeighIn(measuredOn: "2026-03-01", kg: 88.2))
+
+        let result = try await destination.importSnapshot(try await source.exportSnapshot())
+        #expect(result.weighInsImported == 0)
+        #expect(result.weighInsSkipped == 1)
+        #expect(try await destination.weighIns().first?.kg == 88.2, "the local reading stands")
+    }
+
+    @Test("importing the same backup twice adds no weigh-ins the second time")
+    func weighInImportIsIdempotent() async throws {
+        let source = try MealStore(path: nil)
+        try await source.recordWeight(WeighIn(measuredOn: "2026-03-01", kg: 90.0))
+        let snapshot = try await source.exportSnapshot()
+
+        let destination = try MealStore(path: nil)
+        _ = try await destination.importSnapshot(snapshot)
+        let second = try await destination.importSnapshot(snapshot)
+
+        #expect(second.weighInsImported == 0)
+        #expect(try await destination.weighIns().count == 1)
+    }
+
+    @Test("a version 1 file still restores, just without weight history")
+    func olderFormatStillImports() async throws {
+        // Exactly what an export taken before the weight table existed looks
+        // like: no `weighIns` key at all.
+        let legacy = Data("""
+        {
+          "formatVersion": 1,
+          "exportedAt": "2026-03-01T08:00:00.000Z",
+          "meals": [],
+          "settings": {"accent_color": "#7C5CBF"}
+        }
+        """.utf8)
+
+        let store = try MealStore(path: nil)
+        let result = try await store.importJSON(legacy)
+        #expect(result.weighInsImported == 0)
+        #expect(result.settingsApplied == 1, "the rest of the file still restores")
+    }
+}
