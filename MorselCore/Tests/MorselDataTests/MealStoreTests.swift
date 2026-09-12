@@ -79,11 +79,17 @@ struct WritingMeals {
         #expect(abs(mean - 31_000) < 1, "mean rest reflects the intervals actually served")
     }
 
-    @Test("an unfinished meal is not listed as history")
-    func unfinishedMealHidden() async throws {
+    @Test("an unfinished meal is listed, without a duration")
+    func unfinishedMealListed() async throws {
         let store = try makeStore()
         _ = try await store.createMeal(startedAt: t0, restMs: 30_000)
-        #expect(try await store.listMeals().isEmpty, "a meal with no ended_at is still in progress")
+
+        // Listed rather than hidden: an invisible row cannot be deleted, and it
+        // still turns up in exports, so an import reports meals "already here"
+        // that the owner has no way to see.
+        let meal = try #require(try await store.listMeals().first)
+        #expect(meal.durationMs == nil)
+        #expect(!meal.isFinished)
     }
 
     @Test("early bites are stored explicitly, not inferred from timestamps")

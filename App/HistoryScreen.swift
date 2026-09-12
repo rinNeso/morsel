@@ -15,6 +15,7 @@ struct HistoryScreen: View {
     /// the List read a different binding, so nothing ever happened.
     @State private var editing = false
     @State private var selection: Set<Int64> = []
+    @State private var confirmingDelete = false
 
     /// A deleted meal is gone for good — no backend, no trash — so deletes are
     /// held for a few seconds rather than confirmed up front. HIG prefers undo
@@ -57,6 +58,17 @@ struct HistoryScreen: View {
             .toolbar { selectionToolbar }
             .overlay(alignment: .bottom) {
                 if pending != nil { undoBanner }
+            }
+            // A single swipe is self-evidently deliberate and has undo behind
+            // it; deleting a whole selection at once is worth one question
+            // first, as Mail and Photos both do.
+            .confirmationDialog(
+                "Delete \(selection.count) meal\(selection.count == 1 ? "" : "s")?",
+                isPresented: $confirmingDelete,
+                titleVisibility: .visible
+            ) {
+                Button("Delete \(selection.count)", role: .destructive) { deleteSelected() }
+                Button("Cancel", role: .cancel) {}
             }
         }
         .task { await load() }
@@ -116,7 +128,7 @@ struct HistoryScreen: View {
         ToolbarItem(placement: .topBarLeading) {
             if editing {
                 Button(role: .destructive) {
-                    deleteSelected()
+                    confirmingDelete = true
                 } label: {
                     Label("Delete selected", systemImage: "trash")
                 }
@@ -227,10 +239,22 @@ private struct MealRow: View {
                     .font(.headline)
                     .foregroundStyle(theme.text)
                 Spacer()
-                Text(mmss(meal.durationMs))
-                    .font(.headline)
-                    .monospacedDigit()
-                    .foregroundStyle(theme.dim)
+                if let duration = meal.durationMs {
+                    Text(mmss(duration))
+                        .font(.headline)
+                        .monospacedDigit()
+                        .foregroundStyle(theme.dim)
+                } else {
+                    // Never ended — the app was killed mid-meal. Shown rather
+                    // than hidden so it can be deleted, and so an import
+                    // reporting it as "already here" makes sense.
+                    Text("Unfinished")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(theme.dim)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(theme.track, in: .capsule)
+                }
             }
 
             HStack(spacing: 0) {

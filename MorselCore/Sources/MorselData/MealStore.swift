@@ -2,16 +2,24 @@ import Foundation
 import GRDB
 import MorselCore
 
-/// One completed meal, with its bite statistics folded in.
+/// One meal, with its bite statistics folded in.
+///
+/// `durationMs` is nil for a meal that was never ended — the app killed
+/// mid-meal, most likely. Those are listed rather than hidden: an invisible row
+/// cannot be deleted, and it still turns up in exports, which makes an import
+/// report meals "already here" that the owner cannot see.
 public struct MealHistoryEntry: Sendable, Equatable, Identifiable, FetchableRecord, Decodable {
     public let id: Int64
     public let startedAt: Millis
-    public let durationMs: Millis
+    public let durationMs: Millis?
     public let pausedMs: Millis
+
     public let biteCount: Int
     public let meanRestMs: Double?
     public let earlyBites: Int
     public let fullness: Int?
+
+    public var isFinished: Bool { durationMs != nil }
 }
 
 /// Local-first store. No backend, no account, no network — the whole point.
@@ -102,7 +110,7 @@ public final class MealStore: Sendable {
 
     // MARK: Reads
 
-    /// Completed meals, most recent first.
+    /// Every meal, most recent first, finished or not.
     public func listMeals(limit: Int = 100) async throws -> [MealHistoryEntry] {
         try await dbQueue.read { db in
             let rows = try Row.fetchAll(db, sql: """
@@ -117,7 +125,6 @@ public final class MealStore: Sendable {
                     SUM(b.early)        AS earlyBites
                 FROM meal m
                 LEFT JOIN bite b ON b.meal_id = m.id
-                WHERE m.ended_at IS NOT NULL
                 GROUP BY m.id
                 ORDER BY m.started_at DESC
                 LIMIT ?
@@ -125,18 +132,20 @@ public final class MealStore: Sendable {
 
             return rows.compactMap { row -> MealHistoryEntry? in
                 guard let startedAt: String = row["startedAt"],
-                      let endedAt: String = row["endedAt"],
-                      let started = millis(fromISO: startedAt),
-                      let ended = millis(fromISO: endedAt)
+                      let started = millis(fromISO: startedAt)
                 else { return nil }
 
                 let pausedMs = (row["pausedS"] as Int? ?? 0) * 1000
                 let meanRestS: Double? = row["meanRestS"]
 
+                // Nil ended_at means the meal was never finished; it is listed
+                // without a duration rather than hidden.
+                let ended = (row["endedAt"] as String?).flatMap(millis(fromISO:))
+
                 return MealHistoryEntry(
                     id: row["id"],
                     startedAt: started,
-                    durationMs: max(0, ended - started - pausedMs),
+                    durationMs: ended.map { max(0, $0 - started - pausedMs) },
                     pausedMs: pausedMs,
                     biteCount: row["biteCount"] ?? 0,
                     meanRestMs: meanRestS.map { $0 * 1000 },

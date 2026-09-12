@@ -106,7 +106,8 @@ struct Restoring {
         let restored = try await destination.exportSnapshot()
         #expect(restored.meals.count == 1)
         #expect(restored.meals[0].endedAt == nil)
-        #expect(try await destination.listMeals().isEmpty, "still hidden from history, as it should be")
+        let restoredMeal = try #require(try await destination.listMeals().first)
+        #expect(!restoredMeal.isFinished, "it comes back still in progress")
     }
 }
 
