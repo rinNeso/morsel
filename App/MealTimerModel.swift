@@ -107,6 +107,10 @@ final class MealTimerModel {
         }
     }
 
+    /// Set when a meal ends, so the check-in can be scheduled against it. Held
+    /// separately from `mealID`, which is cleared once the meal is dismissed.
+    private(set) var justEndedMealID: Int64?
+
     /// Called as the fields are edited on the end-of-meal screen.
     func saveNutrition() {
         guard let store else { return }
@@ -166,6 +170,7 @@ final class MealTimerModel {
             enqueueWrite { [weak self] in
                 guard let id = self?.mealID else { return }
                 try? await store.endMeal(id: id, endedAt: endedAt, pausedMs: pausedMs)
+                self?.justEndedMealID = id
             }
         }
 

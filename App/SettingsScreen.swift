@@ -71,6 +71,21 @@ struct SettingsScreen: View {
                 }
 
                 Section {
+                    Toggle("Check in after meals", isOn: checkInBinding)
+                    if settings.checkInEnabled {
+                        Picker("Ask after", selection: checkInMinutesBinding) {
+                            ForEach([30, 45, 60, 90], id: \.self) { minutes in
+                                Text("\(minutes) min").tag(minutes)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Satiety check-in")
+                } footer: {
+                    Text("A single notification asking how full you are once the meal has had time to land. Around 45 minutes is when the satiety hormones peak, which is the most informative moment to ask.")
+                }
+
+                Section {
                     if let store {
                         ShareLink(
                             item: ExportedData(store: store),
@@ -141,6 +156,20 @@ struct SettingsScreen: View {
             parts.append("Appearance settings restored.")
         }
         return parts.joined(separator: " ")
+    }
+
+    private var checkInBinding: Binding<Bool> {
+        Binding(
+            get: { settings.checkInEnabled },
+            set: { settings.setCheckIn(enabled: $0, minutes: settings.checkInMinutes) }
+        )
+    }
+
+    private var checkInMinutesBinding: Binding<Int> {
+        Binding(
+            get: { settings.checkInMinutes },
+            set: { settings.setCheckIn(enabled: settings.checkInEnabled, minutes: $0) }
+        )
     }
 
     private var accentBinding: Binding<Color> {

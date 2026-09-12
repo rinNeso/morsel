@@ -5,6 +5,7 @@ import SwiftUI
 struct MorselApp: App {
     @State private var timer: MealTimerModel
     @State private var settings: AppSettings
+    @State private var checkIns = CheckInScheduler()
     private let store: MealStore?
 
     init() {
@@ -21,6 +22,7 @@ struct MorselApp: App {
             RootView()
                 .environment(timer)
                 .environment(settings)
+                .environment(checkIns)
                 .environment(\.mealStore, store)
                 // One app-wide accent, so every control picks it up without a
                 // colour being threaded through by hand.
@@ -39,6 +41,8 @@ struct MorselApp: App {
 
 struct RootView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(MealTimerModel.self) private var timer
+    @Environment(CheckInScheduler.self) private var checkIns
     @Environment(\.colorScheme) private var systemScheme
 
     /// Derived from our own state where the user has chosen, so flipping it
@@ -70,11 +74,32 @@ struct RootView: View {
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
+        .onChange(of: timer.justEndedMealID) { _, mealID in
+            guard let mealID, settings.checkInEnabled else { return }
+            Task {
+                await checkIns.scheduleCheckIn(mealID: mealID, afterMinutes: settings.checkInMinutes)
+            }
+        }
+        .sheet(item: checkInBinding) { pending in
+            CheckInSheet(mealID: pending.id)
+        }
         .environment(\.theme, Theme(
             dark: isDark,
             accent: settings.accent,
             resting: settings.resolvedRestingColor
         ))
+    }
+}
+
+extension RootView {
+    /// `sheet(item:)` wants something Identifiable; the meal id alone is not.
+    struct PendingCheckIn: Identifiable { let id: Int64 }
+
+    var checkInBinding: Binding<PendingCheckIn?> {
+        Binding(
+            get: { checkIns.pendingMealID.map(PendingCheckIn.init) },
+            set: { if $0 == nil { checkIns.pendingMealID = nil } }
+        )
     }
 }
 

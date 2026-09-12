@@ -83,6 +83,17 @@ enum Schema {
             try db.create(index: "weight_date_idx", on: "weight", columns: ["measured_on"])
         }
 
+        migrator.registerMigration("v4-followup-fullness") { db in
+            try db.alter(table: "meal") { t in
+                t.add(column: "fullness_later", .integer) // 1-10, the check-in
+                // When the answer actually arrived. A reply three hours late is
+                // a different measurement from one at forty-five minutes, and
+                // recording it as though it were on time would quietly corrupt
+                // the one thing this check-in exists to measure.
+                t.add(column: "fullness_later_at", .text)
+            }
+        }
+
         return migrator
     }
 }

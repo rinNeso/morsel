@@ -73,6 +73,12 @@ final class AppSettings {
     private(set) var commitmentKgPerWeek: Double?
     private(set) var milestoneCount: Int = 10
 
+    /// Post-meal check-in. On by default, but permission is only requested at
+    /// the first meal's end, so nothing is asked for before it is useful.
+    private(set) var checkInEnabled = true
+    /// ~45 min sits near the peak of satiety signalling; see CheckInScheduler.
+    private(set) var checkInMinutes = 45
+
     /// What the resting ring actually draws with.
     var resolvedRestingColor: Color { restingColor ?? accent }
 
@@ -85,6 +91,8 @@ final class AppSettings {
     private static let goalKey = "goal_kg"
     private static let commitmentKey = "commitment_kg_per_week"
     private static let milestoneCountKey = "milestone_count"
+    private static let checkInKey = "check_in_enabled"
+    private static let checkInMinutesKey = "check_in_minutes"
     /// Sentinel for "follow the accent", so the stored value distinguishes
     /// "deliberately following" from "never set".
     private static let matchAccent = "match"
@@ -111,6 +119,10 @@ final class AppSettings {
         if let raw = try? await store.setting(Self.commitmentKey) { commitmentKgPerWeek = Double(raw) }
         if let raw = try? await store.setting(Self.milestoneCountKey), let count = Int(raw) {
             milestoneCount = count
+        }
+        if let raw = try? await store.setting(Self.checkInKey) { checkInEnabled = raw == "1" }
+        if let raw = try? await store.setting(Self.checkInMinutesKey), let minutes = Int(raw) {
+            checkInMinutes = minutes
         }
     }
 
@@ -145,6 +157,16 @@ final class AppSettings {
             try? await store.setSetting(Self.goalKey, to: kg.map { "\($0)" } ?? "")
             try? await store.setSetting(Self.commitmentKey, to: commitmentKgPerWeek.map { "\($0)" } ?? "")
             try? await store.setSetting(Self.milestoneCountKey, to: "\(count)")
+        }
+    }
+
+    func setCheckIn(enabled: Bool, minutes: Int) {
+        checkInEnabled = enabled
+        checkInMinutes = minutes
+        Task { [weak self] in
+            guard let store = self?.store else { return }
+            try? await store.setSetting(Self.checkInKey, to: enabled ? "1" : "0")
+            try? await store.setSetting(Self.checkInMinutesKey, to: "\(minutes)")
         }
     }
 

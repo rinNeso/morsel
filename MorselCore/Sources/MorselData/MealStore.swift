@@ -112,6 +112,40 @@ public final class MealStore: Sendable {
         }
     }
 
+    /// The post-meal check-in. Stores when the answer arrived alongside it, so
+    /// a late reply can be told apart from a prompt one rather than silently
+    /// standing in for it.
+    public func setLaterFullness(
+        _ rating: Int,
+        at: Millis = Millis(Date().timeIntervalSince1970 * 1000),
+        mealID: Int64
+    ) async throws {
+        try await dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE meal SET fullness_later = ?, fullness_later_at = ? WHERE id = ?",
+                arguments: [rating, iso(from: at), mealID]
+            )
+        }
+    }
+
+    /// How long after the meal ended the check-in was answered, in minutes.
+    /// Nil when unanswered, or when the meal never ended.
+    public func checkInDelayMinutes(mealID: Int64) async throws -> Int? {
+        try await dbQueue.read { db in
+            guard let row = try Row.fetchOne(
+                db,
+                sql: "SELECT ended_at, fullness_later_at FROM meal WHERE id = ?",
+                arguments: [mealID]
+            ),
+            let endedText = row["ended_at"] as String?,
+            let answeredText = row["fullness_later_at"] as String?,
+            let ended = millis(fromISO: endedText),
+            let answered = millis(fromISO: answeredText)
+            else { return nil }
+            return max(0, (answered - ended) / 60_000)
+        }
+    }
+
     public func setFullness(_ rating: Int, mealID: Int64) async throws {
         try await dbQueue.write { db in
             try db.execute(
