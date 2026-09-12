@@ -30,14 +30,16 @@ struct WeightScreen: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 20) {
-                            summary
+                            summary.revealOnScroll()
                             PredictionsPanel(points: points, trendKg: trend.last?.trend, basis: $basis)
+                                .revealOnScroll()
                             if let goal = settings.goalKg, let start = points.first?.kg,
                                let current = trend.last?.trend {
                                 MilestonePanel(startKg: start, goalKg: goal, currentKg: current)
+                                    .revealOnScroll()
                             }
-                            TrendTilesPanel(points: points)
-                            chart
+                            TrendTilesPanel(points: points).revealOnScroll()
+                            chart.revealOnScroll()
                         }
                         .padding(16)
                         .padding(.bottom, 60)
