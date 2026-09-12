@@ -108,14 +108,18 @@ this at the top of `Trend.swift`.
 noise reads roughly three times the true rate. Plateau detection falls out of the same
 confidence interval straddling zero. Do not "simplify" this to a single date.
 
-**No red in the UI, and no scolding copy.** The accent means permission to eat, amber
-means resting, grey means paused. The app reports; it does not judge. Same rule applies
-to any nutrition features: no streak shaming, no "you exceeded your goal".
+**No scolding copy, and the app never chooses red on its own.** Colour carries state:
+the accent means permission to eat, the resting colour means waiting, grey means
+paused. The app reports; it does not judge. The same rule governs any nutrition
+feature: no streak shaming, no "you exceeded your goal".
 
-Exception, decided by the owner: the "ready" colour is user-customisable, and the
-owner explicitly chose to allow red as a pickable accent — picking it is *their*
-call, not the app defaulting to it or an assistant quietly restoring it. Resting
-(amber) and paused (grey) stay fixed regardless of the chosen accent.
+The colour half of this is now the owner's to set, by their explicit decision. The
+accent is user-chosen and red is allowed — picking it is *their* call, not the app
+defaulting to it or an assistant quietly restoring it. The resting colour is also
+user-chosen and follows the accent unless set separately, so amber is a starting
+point rather than a rule. Paused stays fixed grey: "nothing is happening" is not a
+matter of taste. What must not be quietly reversed is the *reporting, not judging*
+posture and the fact that these are settings rather than hardcoded opinions.
 
 **Apple's Human Interface Guidelines are the default authority for anything visual.**
 If a request contradicts current HIG, say so and link the specific guidance so the

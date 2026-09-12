@@ -1,10 +1,12 @@
 import SwiftUI
 import UIKit
 
-/// Colour carries state: the accent means permission to eat, amber means
-/// resting, grey means paused. Never red — the app reports, it does not scold.
-/// (The accent itself becomes user-customisable; resting and paused stay fixed
-/// because they carry meaning the app relies on, not personalisation.)
+/// Colour carries state: the accent means permission to eat, the resting colour
+/// means waiting, grey means paused. The app reports; it does not scold.
+///
+/// Both the accent and the resting colour are user-chosen (see `AppSettings`),
+/// and resting follows the accent unless it is set separately. Paused stays
+/// fixed grey — "nothing is happening" is not a matter of taste.
 enum Palette {
     /// The original "ready" green — the intuitive default before any customising.
     static let defaultAccent = Color(rgb: 0x4C9A5E)
@@ -27,7 +29,6 @@ enum Palette {
     static let text = dynamic(light: 0x22201D, dark: 0xF2EEE8)
     static let dim = dynamic(light: 0x7A736B, dark: 0x9A9187)
     static let track = dynamic(light: 0xEAE3D9, dark: 0x2C2823)
-    static let resting = Color(rgb: 0xC98B3A)
     static let paused = dynamic(light: 0xB5ADA2, dark: 0x5A544C)
 
     private static func dynamic(light: UInt32, dark: UInt32) -> Color {

@@ -37,10 +37,21 @@ final class AppSettings {
     private(set) var accent: Color = Palette.defaultAccent
     private(set) var themeMode: ThemeMode = .system
 
+    /// Nil means "follow the accent", which is the default. Set it to break the
+    /// resting ring out into its own colour.
+    private(set) var restingColor: Color?
+
+    /// What the resting ring actually draws with.
+    var resolvedRestingColor: Color { restingColor ?? accent }
+
     @ObservationIgnored private let store: MealStore?
 
     private static let accentKey = "accent_color"
     private static let themeKey = "theme_mode"
+    private static let restingKey = "resting_color"
+    /// Sentinel for "follow the accent", so the stored value distinguishes
+    /// "deliberately following" from "never set".
+    private static let matchAccent = "match"
 
     init(store: MealStore?) {
         self.store = store
@@ -54,6 +65,9 @@ final class AppSettings {
         if let raw = try? await store.setting(Self.themeKey), let mode = ThemeMode(rawValue: raw) {
             themeMode = mode
         }
+        if let raw = try? await store.setting(Self.restingKey), raw != Self.matchAccent {
+            restingColor = Color(hexString: raw)
+        }
     }
 
     func setAccent(_ color: Color) {
@@ -65,6 +79,13 @@ final class AppSettings {
     func setThemeMode(_ mode: ThemeMode) {
         themeMode = mode
         Task { try? await store?.setSetting(Self.themeKey, to: mode.rawValue) }
+    }
+
+    /// Pass nil to go back to following the accent.
+    func setRestingColor(_ color: Color?) {
+        restingColor = color
+        let stored = color?.hexString ?? Self.matchAccent
+        Task { try? await store?.setSetting(Self.restingKey, to: stored) }
     }
 }
 

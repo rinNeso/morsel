@@ -45,7 +45,18 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Accent colour")
                 } footer: {
-                    Text("Your \"ready\" colour — permission to eat. Resting and paused stay amber and grey.")
+                    Text("Your \"ready\" colour — permission to eat.")
+                }
+
+                Section {
+                    Toggle("Match accent colour", isOn: matchAccentBinding)
+                    if settings.restingColor != nil {
+                        ColorPicker("Resting colour", selection: restingBinding, supportsOpacity: false)
+                    }
+                } header: {
+                    Text("Resting colour")
+                } footer: {
+                    Text("The ring while you're waiting between bites. A separate colour makes \"resting\" and \"take a bite\" readable at a glance from across the table; the ring's fill and countdown already differ either way.")
                 }
             }
             .navigationTitle("Settings")
@@ -58,5 +69,18 @@ struct SettingsScreen: View {
 
     private var themeBinding: Binding<ThemeMode> {
         Binding(get: { settings.themeMode }, set: { settings.setThemeMode($0) })
+    }
+
+    private var matchAccentBinding: Binding<Bool> {
+        Binding(
+            get: { settings.restingColor == nil },
+            // Breaking the link seeds from the current accent, so the picker
+            // opens on something sensible rather than an arbitrary colour.
+            set: { settings.setRestingColor($0 ? nil : settings.accent) }
+        )
+    }
+
+    private var restingBinding: Binding<Color> {
+        Binding(get: { settings.resolvedRestingColor }, set: { settings.setRestingColor($0) })
     }
 }

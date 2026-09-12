@@ -3,7 +3,13 @@ import SwiftUI
 
 struct TimerScreen: View {
     @Environment(MealTimerModel.self) private var model
+    @Environment(AppSettings.self) private var settings
     @Environment(\.scenePhase) private var scenePhase
+
+    /// Read from settings rather than `Color.accentColor`, which resolves the
+    /// environment's accent — not the value `.tint()` sets. Relying on it meant
+    /// the chosen colour could silently fail to reach these views.
+    private var accent: Color { settings.accent }
 
     private let restPresets = [15, 20, 30, 45, 60]
 
@@ -52,9 +58,9 @@ struct TimerScreen: View {
                             .foregroundStyle(selected ? .white : Palette.dim)
                             .padding(.horizontal, 18)
                             .padding(.vertical, 10)
-                            .background(selected ? Color.accentColor : .clear, in: .capsule)
+                            .background(selected ? accent : .clear, in: .capsule)
                             .overlay(
-                                Capsule().strokeBorder(selected ? Color.accentColor : Palette.track, lineWidth: 1.5)
+                                Capsule().strokeBorder(selected ? accent : Palette.track, lineWidth: 1.5)
                             )
                     }
                     .buttonStyle(.plain)
@@ -129,7 +135,9 @@ struct TimerScreen: View {
         let phase = model.state.phase
         let isResting = phase == .resting
             || (phase == .paused && model.state.phaseBeforePause == .resting)
-        let color: Color = phase == .paused ? Palette.paused : (isResting ? Palette.resting : .accentColor)
+        let color: Color = phase == .paused
+            ? Palette.paused
+            : (isResting ? settings.resolvedRestingColor : accent)
 
         return ZStack {
             Circle().stroke(Palette.track, lineWidth: 18)
@@ -147,7 +155,7 @@ struct TimerScreen: View {
                 VStack(spacing: 4) {
                     Text("Take a bite")
                         .font(.title.bold())
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(accent)
                     Text("then tap when it's down")
                         .font(.subheadline)
                         .foregroundStyle(Palette.dim)
