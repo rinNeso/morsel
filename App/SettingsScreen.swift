@@ -70,13 +70,13 @@ struct SettingsScreen: View {
                             item: ExportedData(store: store),
                             preview: SharePreview("Morsel data", image: Image(systemName: "square.and.arrow.up"))
                         ) {
-                            BackupLabel("Export data", symbol: "square.and.arrow.up")
+                            BackupLabel("Export data", symbol: "tray.and.arrow.up")
                         }
                     }
                     Button {
                         importing = true
                     } label: {
-                        BackupLabel("Import data", symbol: "square.and.arrow.down")
+                        BackupLabel("Import data", symbol: "tray.and.arrow.down")
                     }
                     .disabled(store == nil)
                 } header: {
@@ -158,14 +158,15 @@ struct SettingsScreen: View {
 
 /// Export and import sit next to each other, so their icons have to line up.
 ///
-/// Two things push them out on their own. The rows are different containers — a
-/// ShareLink and a Button — which do not lay their labels out identically. And
-/// although `square.and.arrow.up` and `square.and.arrow.down` measure the same
-/// 19x22 box, their ink sits differently inside it: the up arrow protrudes
-/// above the square where the down arrow tucks against it, so their optical
-/// centres disagree even when their frames do not.
+/// They use the `tray` pair rather than `square.and.arrow.up/down`. The latter
+/// looked mismatched on device: `square.and.arrow.up` is the iOS *share* glyph,
+/// drawn to stand alone rather than as half of a set, and its arrow leaves the
+/// square where the down variant's enters it. The tray pair is drawn as a
+/// matched set, and reads better for a backup section anyway — out of storage
+/// and into it, rather than sharing.
 ///
-/// Pinning both to one frame, centred, takes both variables out.
+/// The fixed frame stays regardless: these rows are different containers, a
+/// ShareLink and a Button, which do not lay their labels out identically.
 private struct BackupLabel: View {
     private let title: String
     private let symbol: String
