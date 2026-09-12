@@ -1,0 +1,63 @@
+# XcodeGen spec. Morsel.xcodeproj is generated from this and gitignored —
+# same philosophy the old React Native ios/ folder had, for the same reason:
+# a generated project file has no business being hand-edited or diffed.
+#
+#   xcodegen generate
+#
+# DEVELOPMENT_TEAM is committed deliberately. The RN build lost an hour to
+# `prebuild --clean` silently wiping the signing team out of the generated
+# project; pinning it here means a regenerated project is immediately
+# buildable. It is a personal team ID in a private repo, not a secret.
+
+name: Morsel
+
+options:
+  bundleIdPrefix: com.rinneso
+  deploymentTarget:
+    iOS: "26.0" # Liquid Glass and tabBarMinimizeBehavior are iOS 26 APIs
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+packages:
+  MorselCore:
+    path: MorselCore
+
+targets:
+  Morsel:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    dependencies:
+      - package: MorselCore
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Morsel Next
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        # Deliberately NOT carrying over UIBackgroundModes: ["audio"] from the
+        # RN app. That was a workaround for JS timers being suspended in the
+        # background; this timer derives every duration from the wall clock, so
+        # backgrounding costs nothing and the hack (an App Store rejection
+        # risk) is no longer needed.
+        #
+        # HealthKit/camera usage strings are added when v2/v3 actually need
+        # them. The RN project front-loaded every permission because adding a
+        # native module later meant a whole rebuild cycle; in a native project
+        # that cost is gone, so there's no reason to request what we don't use.
+    settings:
+      base:
+        # Separate bundle ID from the RN build (com.rinneso.morsel) so both can
+        # sit on the phone at once. The RN app stays usable for real meals
+        # until this reaches parity, then this takes over the real identifier.
+        PRODUCT_BUNDLE_IDENTIFIER: com.rinneso.morsel.next
+        PRODUCT_NAME: Morsel
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        DEVELOPMENT_TEAM: K7Z55FU8AF
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "6.0"
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+        SWIFT_STRICT_CONCURRENCY: complete
