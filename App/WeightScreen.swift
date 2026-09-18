@@ -183,7 +183,9 @@ struct WeightScreen: View {
             .chartXVisibleDomain(length: visibleDays * 86_400)
             .chartScrollableAxes(.horizontal)
             .chartScrollPosition(x: $scrollX)
-            .frame(height: 240)
+            // A range rather than a fixed height, so a taller display gives
+            // the trend more room instead of leaving it stranded.
+            .frame(minHeight: 200, idealHeight: 240, maxHeight: 340)
             // Simultaneous, not plain `.gesture`: chartScrollableAxes installs
             // a scroll view whose own recognisers take precedence, so an
             // exclusive gesture here never sees the pinch at all.

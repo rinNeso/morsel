@@ -215,7 +215,8 @@ struct MilestonePanel: View {
                     }
                 }
             }
-            .frame(width: 200, height: 200)
+            .aspectRatio(1, contentMode: .fit)
+            .containerRelativeFrame(.horizontal) { width, _ in min(width * 0.62, 280) }
 
             if let next {
                 let remaining = abs(currentKg - next.targetKg)

@@ -172,7 +172,13 @@ struct TimerScreen: View {
                 }
             }
         }
-        .frame(width: 280, height: 280)
+        // Sized from the container rather than pinned to 280pt. Apple's
+        // iPhone Duo guidance is explicit about avoiding screen-specific
+        // metrics, and the two displays are ~466pt and ~626pt wide — a fixed
+        // ring is chunky on one and adrift on the other. Capped so it stops
+        // growing once it is comfortably the tap target it needs to be.
+        .aspectRatio(1, contentMode: .fit)
+        .containerRelativeFrame(.horizontal) { width, _ in min(width * 0.78, 380) }
         .contentShape(.rect)
         .onTapGesture {
             if phase == .ready || phase == .resting { model.confirmBite() }
