@@ -21,8 +21,13 @@ struct WeightScreen: View {
     /// trend to have shape, short enough that a week's movement is legible.
     @State private var visibleDays: Double = 30
     /// Captured when a pinch begins, so the zoom scales from where it started
-    /// rather than compounding on every gesture update.
-    @State private var pinchBase: Double?
+    /// rather than compounding on every gesture update, and so the date under
+    /// the fingers can be kept there while the span changes.
+    @State private var pinch: Pinch?
+    /// The plot area inside the chart, measured rather than assumed: the y-axis
+    /// labels make it narrower than the chart itself, and the anchor is a
+    /// fraction across the plot, not across the view.
+    @State private var plotRect: CGRect = .zero
     /// Leading edge of the visible window. Bound rather than set once, because
     /// zooming has to move it — see `zoom`.
     @State private var scrollX = Date()
@@ -186,6 +191,19 @@ struct WeightScreen: View {
             // A range rather than a fixed height, so a taller display gives
             // the trend more room instead of leaving it stranded.
             .frame(minHeight: 200, idealHeight: 240, maxHeight: 340)
+            // Measurement only, and deliberately transparent to touches — it
+            // sits above the scroll view that `chartScrollableAxes` installs,
+            // so taking hits here would cost the drag-to-pan.
+            .chartOverlay { proxy in
+                // The anchor, not the proxy: `onGeometryChange` measures off
+                // the main actor, and `ChartProxy` is not Sendable.
+                let plotAnchor = proxy.plotFrame
+                Color.clear
+                    .onGeometryChange(for: CGRect.self) { geometry in
+                        plotAnchor.map { geometry[$0] } ?? .zero
+                    } action: { plotRect = $0 }
+                    .allowsHitTesting(false)
+            }
             // Simultaneous, not plain `.gesture`: chartScrollableAxes installs
             // a scroll view whose own recognisers take precedence, so an
             // exclusive gesture here never sees the pinch at all.
@@ -207,27 +225,57 @@ struct WeightScreen: View {
     /// deliberate gesture still covers ground.
     private static let zoomDamping = 0.5
 
+    /// What a pinch is measured against: the span it started from, and the date
+    /// that has to stay put, expressed as where across the plot the fingers are.
+    private struct Pinch {
+        let baseDays: Double
+        let anchorDate: Date
+        /// 0 at the leading edge of the plot, 1 at the trailing edge.
+        let fraction: Double
+    }
+
     /// Pinching out shows *less* time, which is what zooming in means — so the
     /// visible span divides by the magnification rather than multiplying.
     private var zoom: some Gesture {
         MagnifyGesture()
             .onChanged { value in
-                let base = pinchBase ?? visibleDays
-                if pinchBase == nil { pinchBase = visibleDays }
-                let damped = pow(max(value.magnification, 0.01), Self.zoomDamping)
-                let updated = min(max(base / damped, 7), maxDays)
+                if pinch == nil { pinch = beginPinch(at: value.startLocation) }
+                guard let pinch else { return }
 
-                // Hold the middle of the view still. Swift Charts anchors the
-                // scroll to the *leading* edge, so changing the span alone
-                // collapses the window towards wherever that edge happens to
-                // be — zoom in on the last fortnight and you end up looking at
-                // the middle of the series instead. Recentring keeps whatever
-                // you were reading under your fingers.
-                let centre = scrollX.addingTimeInterval(visibleDays * 86_400 / 2)
+                let damped = pow(max(value.magnification, 0.01), Self.zoomDamping)
+                let updated = min(max(pinch.baseDays / damped, 7), maxDays)
+
+                // Swift Charts anchors the scroll to the *leading* edge, so
+                // changing the span alone collapses the window towards wherever
+                // that edge happens to be. Solving for the leading edge that
+                // leaves the anchor date where the fingers are holds it still.
                 visibleDays = updated
-                scrollX = centre.addingTimeInterval(-updated * 86_400 / 2)
+                scrollX = pinch.anchorDate
+                    .addingTimeInterval(-pinch.fraction * updated * 86_400)
             }
-            .onEnded { _ in pinchBase = nil }
+            .onEnded { _ in pinch = nil }
+    }
+
+    /// The date under the fingers when the pinch began, and where they sit
+    /// across the plot.
+    ///
+    /// Anchoring there rather than on the view centre is the whole point: the
+    /// centre only coincides with the fingers when the pinch happens to start
+    /// in the middle, and the error grows the nearer an edge it starts — zoom
+    /// into the last fortnight with the centre a month back and the window
+    /// walks away from what you were looking at.
+    ///
+    /// Falls back to the centre if the plot has not been measured yet, which is
+    /// exactly the behaviour this replaces.
+    private func beginPinch(at location: CGPoint) -> Pinch {
+        let fraction = plotRect.width > 0
+            ? min(max((location.x - plotRect.minX) / plotRect.width, 0), 1)
+            : 0.5
+        return Pinch(
+            baseDays: visibleDays,
+            anchorDate: scrollX.addingTimeInterval(fraction * visibleDays * 86_400),
+            fraction: fraction
+        )
     }
 
     /// Never zoom out past the data — empty space either side reads as missing
