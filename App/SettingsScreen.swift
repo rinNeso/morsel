@@ -57,6 +57,10 @@ struct SettingsScreen: View {
                 }
 
                 Section {
+                    ColourPreview()
+                }
+
+                Section {
                     Toggle("Match accent colour", isOn: matchAccentBinding)
                     if let resting = settings.restingColor {
                         ColorPicker("Resting colour", selection: restingBinding, supportsOpacity: false)
@@ -224,6 +228,62 @@ private struct BackupLabel: View {
         } icon: {
             Image(systemName: symbol)
                 .frame(width: 22, height: 22)
+        }
+    }
+}
+
+/// Both ring colours in the shape they are actually seen in, sitting between the
+/// two pickers that set them. The question these settings really ask is whether
+/// "take a bite" and "resting" read differently at a glance from across a table,
+/// and two swatches in a list cannot answer it — the ring can.
+///
+/// Static rather than sweeping: the question is about colour, and motion in a
+/// settings list pulls the eye to the motion instead. The stroke is heavier than
+/// a true scale reduction of the real ring would give, because judging a colour
+/// needs area to judge it on.
+private struct ColourPreview: View {
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        HStack(spacing: 32) {
+            ring(color: theme.accent, progress: 1, caption: "Take a bite") {
+                Image(systemName: "fork.knife")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(theme.accent)
+            }
+            ring(color: theme.resting, progress: 0.62, caption: "Resting") {
+                Text("12")
+                    .font(.system(size: 26, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(theme.text)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Preview of the take-a-bite and resting ring colours")
+    }
+
+    private func ring<Centre: View>(
+        color: Color,
+        progress: Double,
+        caption: String,
+        @ViewBuilder centre: () -> Centre
+    ) -> some View {
+        VStack(spacing: 8) {
+            ZStack {
+                Circle().stroke(theme.track, lineWidth: 10)
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(color, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                centre()
+            }
+            .frame(width: 78, height: 78)
+
+            Text(caption)
+                .font(.caption)
+                .foregroundStyle(theme.dim)
         }
     }
 }
