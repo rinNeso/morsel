@@ -46,6 +46,11 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Morsel
+        # Read through from the build settings below rather than left to
+        # XcodeGen's defaults, which are 1.0/1 and silently won the argument —
+        # the first archive built as 1.0 despite MARKETING_VERSION saying 0.1.0.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -61,10 +66,25 @@ targets:
         NSHealthShareUsageDescription: >-
           Morsel reads your weight history from Health so it can chart your
           trend alongside your meals.
+        # Required even though nothing writes to Health: App Store Connect
+        # rejects any build carrying the HealthKit entitlement unless *both*
+        # purpose strings are present, regardless of which APIs are called.
+        # The string is only ever surfaced if the app asks for write access,
+        # which it does not — so it says so rather than promising a feature.
+        NSHealthUpdateUsageDescription: >-
+          Morsel does not write to Health. It only reads your weight history
+          to chart your trend.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.rinneso.morsel
         PRODUCT_NAME: Morsel
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # iPhone only. XcodeGen defaults to iPhone+iPad, and App Store Connect
+        # then rejects the build: an iPad target must declare all four
+        # orientations for multitasking, which would undo the deliberate
+        # portrait lock below. This is a phone-on-the-table app — the Duo is
+        # still an iPhone, so nothing about #15 needs iPad here.
+        TARGETED_DEVICE_FAMILY: "1"
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         DEVELOPMENT_TEAM: K7Z55FU8AF
