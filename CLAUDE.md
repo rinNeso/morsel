@@ -126,6 +126,15 @@ gains red, as Happy Scale does. The argument that carried it is that a
 *trend-derived* gain is a real signal rather than scale noise, so the colour is
 reporting something true. Do not strip this out on the strength of the rule above.
 
+**A calorie day may use red for going over goal.** A third explicit owner override
+(2026-09-19), extending the second to the intake screen: days at or under the daily
+goal read green, days over read red, on the same argument. It is narrower than it
+looks — the colour only appears once the owner has set a goal, and there is no
+default goal, so the app never invents a target and then colours you against it.
+
+The copy stays factual either way: "58 over goal" states the gap and stops. No
+"over budget", no streaks, no praise for a green day.
+
 What must not be quietly reversed is the *reporting, not judging* posture, and the
 fact that these are settings rather than hardcoded opinions. No streak shaming, no
 "you exceeded your goal", nothing that editorialises beyond stating the number.

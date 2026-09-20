@@ -66,6 +66,9 @@ struct RootView: View {
             Tab("History", systemImage: "list.bullet") {
                 HistoryScreen()
             }
+            Tab("Calories", systemImage: "flame") {
+                NutritionScreen()
+            }
             Tab("Weight", systemImage: "scalemass") {
                 WeightScreen()
             }

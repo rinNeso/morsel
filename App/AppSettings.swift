@@ -69,6 +69,10 @@ final class AppSettings {
     /// Where you're headed. Nil until set — milestones and a goal date have
     /// nothing to say without it.
     private(set) var goalKg: Double?
+    /// Daily energy target. Nil until set — the intake screen reports totals
+    /// perfectly well without one, and an invented default would be a number
+    /// the app made up about someone else's body.
+    private(set) var goalKcal: Int?
     /// The rate you're aiming for, as opposed to the one you're achieving.
     private(set) var commitmentKgPerWeek: Double?
     private(set) var milestoneCount: Int = 10
@@ -89,6 +93,7 @@ final class AppSettings {
     private static let restingKey = "resting_color"
     private static let weightUnitKey = "weight_unit"
     private static let goalKey = "goal_kg"
+    private static let goalKcalKey = "goal_kcal"
     private static let commitmentKey = "commitment_kg_per_week"
     private static let milestoneCountKey = "milestone_count"
     private static let checkInKey = "check_in_enabled"
@@ -116,6 +121,7 @@ final class AppSettings {
             weightUnit = unit
         }
         if let raw = try? await store.setting(Self.goalKey) { goalKg = Double(raw) }
+        if let raw = try? await store.setting(Self.goalKcalKey) { goalKcal = Int(raw) }
         if let raw = try? await store.setting(Self.commitmentKey) { commitmentKgPerWeek = Double(raw) }
         if let raw = try? await store.setting(Self.milestoneCountKey), let count = Int(raw) {
             milestoneCount = count
@@ -157,6 +163,14 @@ final class AppSettings {
             try? await store.setSetting(Self.goalKey, to: kg.map { "\($0)" } ?? "")
             try? await store.setSetting(Self.commitmentKey, to: commitmentKgPerWeek.map { "\($0)" } ?? "")
             try? await store.setSetting(Self.milestoneCountKey, to: "\(count)")
+        }
+    }
+
+    func setGoal(kcal: Int?) {
+        goalKcal = kcal
+        Task { [weak self] in
+            guard let store = self?.store else { return }
+            try? await store.setSetting(Self.goalKcalKey, to: kcal.map { "\($0)" } ?? "")
         }
     }
 
