@@ -93,14 +93,21 @@ APP="$OUT/unpacked/Payload/Morsel.app"
 mkdir -p "$OUT/unpacked"
 unzip -q "$OUT/export/Morsel.ipa" -d "$OUT/unpacked"
 
-if ! codesign -dv --verbose=2 "$APP" 2>&1 | grep -q "Authority=Apple Distribution"; then
+# Captured first rather than piped into `grep -q`: under `pipefail` a quiet grep
+# exits on its first match, the producer takes SIGPIPE, and the pipeline reports
+# failure even though the match succeeded.
+SIGNING=$(codesign -dv --verbose=2 "$APP" 2>&1)
+ENTITLEMENTS=$(codesign -d --entitlements :- "$APP" 2>/dev/null | plutil -p -)
+
+if ! grep -q "Authority=Apple Distribution" <<<"$SIGNING"; then
     echo "error: not signed with an Apple Distribution certificate." >&2
-    codesign -dv --verbose=2 "$APP" 2>&1 | grep "Authority=" >&2
+    grep "Authority=" <<<"$SIGNING" >&2
     exit 1
 fi
 
-if ! codesign -d --entitlements :- "$APP" 2>/dev/null | plutil -p - | grep -q '"get-task-allow" => 0'; then
+if ! grep -q '"get-task-allow" => false' <<<"$ENTITLEMENTS"; then
     echo "error: get-task-allow is not false — App Store Connect will reject this." >&2
+    grep "get-task-allow" <<<"$ENTITLEMENTS" >&2
     exit 1
 fi
 
