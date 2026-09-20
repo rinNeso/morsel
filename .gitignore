@@ -8,6 +8,7 @@ Morsel.xcodeproj/
 
 # SwiftPM / Xcode build products
 .build/
+build/
 .swiftpm/
 DerivedData/
 xcuserdata/

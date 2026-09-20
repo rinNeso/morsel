@@ -57,7 +57,18 @@ xcodebuild -project Morsel.xcodeproj -scheme Morsel -configuration Debug \
 xcrun devicectl list devices                # find the phone, check it is reachable
 xcrun devicectl device install app --device <udid> <path-to>/Morsel.app
 xcrun devicectl device process launch --device <udid> com.rinneso.morsel
+./Scripts/release.sh                        # archive, verify signing, upload to TestFlight
 ```
+
+`Scripts/release.sh` is the only way a build should reach TestFlight. The build
+number is `git rev-list --count HEAD` rather than a value in `project.yml`:
+App Store Connect burns a version/build pair permanently on first upload, so a
+hand-bumped number is the step that gets forgotten until the upload fails at the
+very end. It refuses to run on a dirty tree, because a build number derived from
+history cannot identify a build containing changes that are not in that history.
+It also checks the export is distribution-signed *before* uploading — the first
+manual attempt produced a development-signed archive that looked fine locally and
+was only rejected once it reached Apple.
 
 `Morsel.xcodeproj` is gitignored on purpose — it is generated. Never commit or
 hand-edit it; change `project.yml` and regenerate.

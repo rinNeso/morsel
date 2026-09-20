@@ -86,6 +86,11 @@ targets:
         # still an iPhone, so nothing about #15 needs iPad here.
         TARGETED_DEVICE_FAMILY: "1"
         MARKETING_VERSION: "0.1.0"
+        # Only a fallback for local and Xcode-UI builds. Releases go through
+        # `Scripts/release.sh`, which passes the commit count instead — App
+        # Store Connect burns a version/build pair permanently on first upload,
+        # and a hand-bumped number is the step that gets forgotten until the
+        # upload fails at the end.
         CURRENT_PROJECT_VERSION: "1"
         DEVELOPMENT_TEAM: K7Z55FU8AF
         CODE_SIGN_STYLE: Automatic
