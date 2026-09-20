@@ -239,7 +239,18 @@ private struct MealRow: View {
                     .font(.headline)
                     .foregroundStyle(theme.text)
                 Spacer()
-                if let duration = meal.durationMs {
+                if meal.isManual {
+                    // Also has no duration, but for an entirely different
+                    // reason from the case below: nothing was interrupted, it
+                    // simply was never timed. Labelling it "Unfinished" would
+                    // report a failure that did not happen.
+                    Text("Manual")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(theme.dim)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(theme.track, in: .capsule)
+                } else if let duration = meal.durationMs {
                     Text(mmss(duration))
                         .font(.headline)
                         .monospacedDigit()
@@ -258,9 +269,15 @@ private struct MealRow: View {
             }
 
             HStack(spacing: 0) {
-                stat("\(meal.biteCount)", "bites")
-                stat(meal.meanRestMs.map { "\(Int(($0 / 1000).rounded()))s" } ?? "—", "avg pace")
-                stat("\(meal.earlyBites)", "early")
+                // Bites, pace and early counts are omitted for a manual meal
+                // rather than shown as zeroes. A zero is a measurement; these
+                // were never measured, and printing "0 bites" would claim
+                // something about a meal nobody watched.
+                if !meal.isManual {
+                    stat("\(meal.biteCount)", "bites")
+                    stat(meal.meanRestMs.map { "\(Int(($0 / 1000).rounded()))s" } ?? "—", "avg pace")
+                    stat("\(meal.earlyBites)", "early")
+                }
                 stat(meal.fullness.map { "\($0)/10" } ?? "—", "fullness")
                 stat(meal.kcal.map { "\($0)" } ?? "—", "kcal")
             }

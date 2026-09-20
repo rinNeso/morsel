@@ -20,8 +20,12 @@ public struct MealHistoryEntry: Sendable, Equatable, Identifiable, FetchableReco
     public let fullness: Int?
     public let kcal: Int?
     public let notes: String?
+    /// Recorded by hand rather than timed. There are no bites and no duration
+    /// behind it, so anything reasoning about pace has to exclude it rather
+    /// than read it as a timed meal that logged nothing.
+    public let isManual: Bool
 
-    public var isFinished: Bool { durationMs != nil }
+    public var isFinished: Bool { durationMs != nil || isManual }
 }
 
 /// Local-first store. No backend, no account, no network — the whole point.
@@ -62,6 +66,42 @@ public final class MealStore: Sendable {
             try db.execute(
                 sql: "INSERT INTO meal (started_at, target_interval_s) VALUES (?, ?)",
                 arguments: [iso(from: startedAt), Int(Double(restMs) / 1000)]
+            )
+            return db.lastInsertedRowID
+        }
+    }
+
+    /// Record a meal that was eaten without the timer running.
+    ///
+    /// Stored as `source = manual` rather than as a timed meal with no bites.
+    /// It has no pace, no duration and no rest interval, because none were
+    /// measured — writing plausible-looking values for them would put fiction
+    /// into the one table the v4 correlation reads.
+    ///
+    /// `target_interval_s` is NOT NULL in the schema and gets 0 here: not a
+    /// configured interval, but the absence of one. Nothing reads it for a
+    /// manual meal.
+    @discardableResult
+    public func recordManualMeal(
+        startedAt: Millis,
+        kcal: Int?,
+        notes: String?,
+        fullness: Int?
+    ) async throws -> Int64 {
+        try await dbQueue.write { db in
+            try db.execute(
+                sql: """
+                    INSERT INTO meal
+                        (started_at, ended_at, target_interval_s, bite_count, paused_s,
+                         fullness_after, kcal, notes, source)
+                    VALUES (?, NULL, 0, 0, 0, ?, ?, ?, 'manual')
+                    """,
+                arguments: [
+                    iso(from: startedAt),
+                    fullness,
+                    kcal,
+                    notes?.isEmpty == true ? nil : notes,
+                ]
             )
             return db.lastInsertedRowID
         }
@@ -170,6 +210,7 @@ public final class MealStore: Sendable {
                     m.fullness_after    AS fullness,
                     m.kcal              AS kcal,
                     m.notes             AS notes,
+                    m.source            AS source,
                     AVG(b.interval_s)   AS meanRestS,
                     SUM(b.early)        AS earlyBites
                 FROM meal m
@@ -201,7 +242,8 @@ public final class MealStore: Sendable {
                     earlyBites: row["earlyBites"] as Int? ?? 0,
                     fullness: row["fullness"],
                     kcal: row["kcal"],
-                    notes: row["notes"]
+                    notes: row["notes"],
+                    isManual: (row["source"] as String? ?? "timed") == "manual"
                 )
             }
         }

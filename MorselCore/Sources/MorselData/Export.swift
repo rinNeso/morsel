@@ -70,6 +70,9 @@ public struct ExportedMeal: Codable, Sendable, Equatable {
     public let fullnessAfter: Int?
     public let kcal: Int?
     public let notes: String?
+    /// `timed` or `manual`. Optional so an export written before manual meals
+    /// existed still decodes; absent means timed, which every meal was then.
+    public let source: String?
     public let bites: [ExportedBite]
 }
 
@@ -86,7 +89,7 @@ extension MealStore {
         try await dbQueue.read { db in
             let mealRows = try Row.fetchAll(db, sql: """
                 SELECT id, started_at, ended_at, label, target_interval_s, target_duration_s,
-                       paused_s, hunger_before, fullness_after, kcal, notes
+                       paused_s, hunger_before, fullness_after, kcal, notes, source
                 FROM meal
                 ORDER BY started_at ASC
                 """)
@@ -126,6 +129,7 @@ extension MealStore {
                     fullnessAfter: row["fullness_after"],
                     kcal: row["kcal"],
                     notes: row["notes"],
+                    source: row["source"],
                     bites: bitesByMeal[row["id"]] ?? []
                 )
             }

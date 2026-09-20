@@ -16,16 +16,19 @@ struct NutritionScreen: View {
     @State private var days: [DayIntake] = []
     @State private var loaded = false
     @State private var editingGoal = false
+    @State private var addingMeal = false
 
     var body: some View {
         NavigationStack {
             Group {
                 if days.isEmpty && loaded {
-                    ContentUnavailableView(
-                        "Nothing logged yet",
-                        systemImage: "flame",
-                        description: Text("Add calories at the end of a meal and the days will collect here.")
-                    )
+                    ContentUnavailableView {
+                        Label("Nothing logged yet", systemImage: "flame")
+                    } description: {
+                        Text("Calories are recorded at the end of a meal. You can also add a meal you ate without the timer.")
+                    } actions: {
+                        Button("Add a meal") { addingMeal = true }
+                    }
                 } else {
                     ScrollView {
                         VStack(spacing: 20) {
@@ -43,10 +46,25 @@ struct NutritionScreen: View {
             .background(theme.bg)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Daily goal", systemImage: "flag") { editingGoal = true }
+                    Menu {
+                        Button("Add a meal", systemImage: "plus") { addingMeal = true }
+                        Button("Daily goal", systemImage: "flag") { editingGoal = true }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
                 }
             }
             .sheet(isPresented: $editingGoal) { KcalGoalSheet() }
+            .sheet(isPresented: $addingMeal) {
+                ManualMealSheet { startedAt, kcal, notes, fullness in
+                    Task {
+                        _ = try? await store?.recordManualMeal(
+                            startedAt: startedAt, kcal: kcal, notes: notes, fullness: fullness
+                        )
+                        await load()
+                    }
+                }
+            }
         }
         .task { await load() }
     }
@@ -252,6 +270,81 @@ struct NutritionScreen: View {
         guard let store else { return }
         days = (try? await store.dailyIntake()) ?? []
         loaded = true
+    }
+}
+
+/// Records a meal that happened without the timer.
+///
+/// Only what was actually observed: when, how much, what it was, and optionally
+/// how full it left you. No bites, no duration, no rest interval — those were
+/// never measured, and offering fields for them would invite guesses into the
+/// one table the pace analysis reads.
+private struct ManualMealSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
+
+    let onSave: (Millis, Int?, String?, Int?) -> Void
+
+    @State private var eatenAt = Date()
+    @State private var kcalText = ""
+    @State private var notes = ""
+    @State private var fullness: Int?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    DatePicker("When", selection: $eatenAt, in: ...Date())
+                } footer: {
+                    Text("The day it lands on is the day it counts toward.")
+                }
+
+                Section("What you ate") {
+                    HStack {
+                        TextField("Calories", text: $kcalText)
+                            .keyboardType(.numberPad)
+                            .monospacedDigit()
+                        Text("kcal")
+                            .foregroundStyle(theme.dim)
+                    }
+                    TextField("Sandwich, coffee…", text: $notes, axis: .vertical)
+                        .lineLimit(1...3)
+                }
+
+                Section {
+                    Picker("How full afterwards", selection: $fullness) {
+                        Text("Not rated").tag(Int?.none)
+                        ForEach(1...10, id: \.self) { value in
+                            Text("\(value)").tag(Int?.some(value))
+                        }
+                    }
+                } footer: {
+                    // Same stance the end-of-meal prompt takes: an unrated meal
+                    // is honest, a guessed one is noise in the column that is
+                    // supposed to mean something. Recalling it hours later is
+                    // closer to guessing, so nothing is pre-selected.
+                    Text("Optional. Leave it unrated rather than guessing.")
+                }
+            }
+            .navigationTitle("Add a meal")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onSave(
+                            Millis(eatenAt.timeIntervalSince1970 * 1000),
+                            Int(kcalText),
+                            notes.isEmpty ? nil : notes,
+                            fullness
+                        )
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 

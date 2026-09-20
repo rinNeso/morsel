@@ -20,7 +20,11 @@ CREATE TABLE meal (
   -- Flat total, added ahead of the meal_item/food modelling below. The v4
   -- correlation needs the total, not the breakdown; v3 sums its items here.
   kcal              INTEGER,
-  photo_uri         TEXT
+  photo_uri         TEXT,
+  -- timed | manual. Recorded rather than inferred from bite_count = 0: a
+  -- manual meal has no measured pace, and the v4 correlation would otherwise
+  -- average it into every pace figure as a timed meal that logged nothing.
+  source            TEXT    NOT NULL DEFAULT 'timed'
 );
 CREATE INDEX meal_started_idx ON meal(started_at DESC);
 

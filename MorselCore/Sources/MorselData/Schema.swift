@@ -94,6 +94,26 @@ enum Schema {
             }
         }
 
+        // Recorded explicitly rather than inferred from `bite_count == 0`.
+        // That inference would hold today and is still the wrong call: it is
+        // the same mistake the React Native build made deriving `early` from
+        // `cued_at == taken_at`, which was true only as a coincidence of the
+        // reducer.
+        //
+        // The cost of conflating them lands on the v4 correlation. It compares
+        // pace against fullness at a calorie load, and a manual meal has no
+        // pace — nobody measured one. Indistinguishable manual meals would be
+        // averaged into every pace figure as though they were timed meals that
+        // happened to record nothing, which is an error that never announces
+        // itself.
+        //
+        // Defaults to `timed`, which is what every existing row is.
+        migrator.registerMigration("v5-manual-meals") { db in
+            try db.alter(table: "meal") { t in
+                t.add(column: "source", .text).notNull().defaults(to: "timed") // timed | manual
+            }
+        }
+
         return migrator
     }
 }

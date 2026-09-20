@@ -79,8 +79,9 @@ extension MealStore {
                     sql: """
                         INSERT INTO meal (
                             started_at, ended_at, label, target_interval_s, target_duration_s,
-                            bite_count, paused_s, hunger_before, fullness_after, kcal, notes
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            bite_count, paused_s, hunger_before, fullness_after, kcal, notes,
+                            source
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                     arguments: [
                         meal.startedAt, meal.endedAt, meal.label,
@@ -90,6 +91,9 @@ extension MealStore {
                         // with the rows it is counting.
                         meal.bites.count,
                         meal.pausedS, meal.hungerBefore, meal.fullnessAfter, meal.kcal, meal.notes,
+                        // An export predating manual meals carries no source;
+                        // everything in one was timed.
+                        meal.source ?? "timed",
                     ]
                 )
                 let mealID = db.lastInsertedRowID
