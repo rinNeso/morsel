@@ -53,10 +53,14 @@ struct TimerScreen: View {
                     Button {
                         model.restSeconds = seconds
                     } label: {
+                        // Five chips at 18pt padding overran a 402pt-wide phone and
+                        // SwiftUI wrapped "60s" onto two lines rather than clip it.
                         Text("\(seconds)s")
                             .font(.callout.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                             .foregroundStyle(selected ? .white : theme.dim)
-                            .padding(.horizontal, 18)
+                            .padding(.horizontal, 14)
                             .padding(.vertical, 10)
                             .background(selected ? accent : .clear, in: .capsule)
                             .overlay(
